@@ -2,6 +2,8 @@
 
 A browser-based tool for building and visualizing discrete-event simulations. Write TypeScript simulation code in an in-browser editor, and see it rendered as an interactive node-edge diagram — all client-side.
 
+**Try it live:** [vibediagram-public.vercel.app/projects](https://vibediagram-public.vercel.app/projects)
+
 For architecture and maintenance details, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Getting Started

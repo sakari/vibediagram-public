@@ -205,6 +205,15 @@ const ProjectListPage: React.FC = () => {
     <div className="project-list-page">
       <header className="project-list-header">
         <h1>VibeDiagram</h1>
+        <a
+          className="github-link"
+          href="https://github.com/sakari/vibediagram-public"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View source on GitHub"
+        >
+          GitHub
+        </a>
         <AccountIdDisplay accountId={me.$jazz.id} />
         <div className="project-list-header-actions">
           {store && <AuthorizedAccountsSettings me={me} store={store} />}

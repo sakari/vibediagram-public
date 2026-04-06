@@ -480,6 +480,16 @@
   margin: 0;
 }
 
+.github-link {
+  color: #a0a0a0;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.github-link:hover {
+  color: #646cff;
+}
+
 .new-project-btn {
   background: #3498db;
   color: white;
