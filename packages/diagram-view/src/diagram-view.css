@@ -1,0 +1,37 @@
+/* Neutralize the cosmetic defaults that base.css / style.css apply to node
+   wrappers. base.css sets --xy-node-border and --xy-node-color; style.css adds
+   --xy-node-background-color (#fff) and box-shadow on hover/selected.
+   Our custom node components (DefaultNode, GroupNode) control their own border,
+   color, and background via inline styles on their inner divs, so we disable
+   all wrapper-level cosmetic defaults here.
+   See plans/react-flow-styles/ for full rationale. */
+.react-flow {
+  --xy-node-border: none;
+  --xy-node-border-selected: none;
+  --xy-node-color: inherit;
+  --xy-node-background-color: transparent;
+  --xy-node-boxshadow-hover: none;
+  --xy-node-boxshadow-selected: none;
+}
+
+/* Let node wrappers auto-size to content instead of being constrained
+   by the inline width/height that React Flow sets from ELK dimensions.
+   This ensures node.measured captures the true intrinsic content size,
+   which the measurement cycle feeds back to ELK for accurate layout.
+   Groups are excluded — they need explicit ELK-computed dimensions. */
+.react-flow__node:not(.react-flow__node-group) {
+  width: max-content !important;
+  height: max-content !important;
+}
+
+/* Labels with a description tooltip: dashed underline hints at hover interaction. */
+.diagram-label-hint {
+  text-decoration: underline dotted #6a6a8a;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+.diagram-label-hint:hover {
+  color: #ffffff;
+  text-decoration-color: #9090b0;
+}

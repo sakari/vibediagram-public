@@ -1,0 +1,28 @@
+{
+  "name": "@diagram/sim-worker",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:check": "vitest run --reporter dot --bail 1 --coverage",
+    "test:watch": "vitest",
+    "bench": "vitest bench",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@diagram/sim-model": "workspace:^",
+    "@diagram/sim-default-engine": "workspace:^",
+    "@diagram/diagram-view": "workspace:^",
+    "@rollup/browser": "^4.60.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.4",
+    "rollup": "^4.60.0",
+    "typescript": "^5.2.2",
+    "vitest": "^3.0.0"
+  }
+}
