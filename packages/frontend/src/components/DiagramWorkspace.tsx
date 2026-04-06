@@ -306,16 +306,15 @@ const DiagramWorkspace: React.FC = () => {
   /** Pin the Jazz document to the current deployment so viewers open the same app version. */
   const pinToCurrentDeployment = useCallback(() => {
     if (!document || !canWrite || __DEPLOYMENT_ID__ === "local") return;
+    if (document.pinnedDeploymentId === __DEPLOYMENT_ID__) return;
     document.$jazz.set("pinnedDeploymentId", __DEPLOYMENT_ID__);
     document.$jazz.set("pinnedDeploymentUrl", __DEPLOYMENT_URL__);
   }, [document, canWrite]);
 
-  // Auto-pin when a simulation run completes successfully
+  // Auto-pin when the project is loaded and writable
   useEffect(() => {
-    if (sim.status === "done") {
-      pinToCurrentDeployment();
-    }
-  }, [sim.status, pinToCurrentDeployment]);
+    pinToCurrentDeployment();
+  }, [pinToCurrentDeployment]);
 
   const showVersionBanner = useMemo(() => {
     if (versionBannerDismissed) return false;
