@@ -8,9 +8,11 @@ import {
   Engine,
   InputNode,
   Metric,
+  type InstanceParams,
   type MetricSnapshot,
   type Model,
   type Node,
+  type NodeClass,
   type Registration,
 } from "@diagram/sim-model";
 import { EventQueue } from "./event-queue";
@@ -153,31 +155,31 @@ export function createEngine(
   }
 
   /**
-   * Dynamically registers a new node. Reuses model.create() for sentinel
+   * Dynamically registers a new node. Reuses model.create() for schema
    * scanning and registration, then wireNode() for params + engine facade
    * wiring — the same calls used by the static introspect path.
    */
   function spawnNode<T extends Node>(
     name: string,
-    Class: new () => T,
-    thunk?: () => Record<string, unknown>,
+    Class: NodeClass<T>,
+    params?: Record<string, unknown>,
     parentName?: string,
   ): T {
-    // Default to empty-object thunk when caller omits it (mirrors Model.create behaviour).
-    const resolvedThunk = thunk ?? (() => ({}));
+    // model.create handles: new instance, schema scanning, registration.
+    // The `params as never` cast bridges runtime-typed params (arrived via
+    // engine.spawn) to create's generic-typed params; the wire call below
+    // validates them at runtime, so no type safety is actually lost.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- runtime→generic bridge; params are re-validated by the introspect/wire path
+    const instance = model.create(name, Class, params as never);
 
-    // model.create handles: new instance, sentinel scanning, registration
-    const instance = model.create(name, Class, resolvedThunk);
-
-    // Apply sentinel defaults to fill missing fields (same as introspect path).
+    // Apply sentinel defaults to fill missing fields (same as introspect path),
+    // then wire params + engine facade, then mark wired so .set() is blocked.
     const reg = model.registrations.find((r) => r.name === name);
-    const thunkResult = resolvedThunk();
     if (reg) {
-      fillDefaults(model, name, reg.paramsSchema, thunkResult);
+      fillDefaults(model, name, reg.paramsSchema, reg.pendingParams);
+      wireNode(instance, name, reg.pendingParams, createEngineFacade);
+      reg.wired = true;
     }
-
-    // wireNode handles: params assignment + engine facade wiring (same as introspect)
-    wireNode(instance, name, thunkResult, createEngineFacade);
 
     // Record spawn relationship so topology extraction can draw edges
     if (parentName) {
@@ -218,10 +220,18 @@ export function createEngine(
 
       override spawn<T extends Node>(
         spawnName: string,
-        SpawnClass: new () => T,
-        spawnThunk?: () => Record<string, unknown>,
+        SpawnClass: NodeClass<T>,
+        spawnParams?: Partial<InstanceParams<T>>,
       ): T {
-        return spawnNode(spawnName, SpawnClass, spawnThunk, name);
+        // Bridge the typed Partial<InstanceParams<T>> to the runtime-typed
+        // params record passed into spawnNode; the introspect/wire path
+        // re-validates these at runtime so no type safety is lost.
+        return spawnNode(
+          spawnName,
+          SpawnClass,
+          spawnParams as Record<string, unknown> | undefined,
+          name,
+        );
       }
 
       override now(): number {

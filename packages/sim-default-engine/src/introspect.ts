@@ -1,6 +1,7 @@
 /**
- * Step-introspection: evaluates thunks, validates results against paramsSchema,
- * wires instance.params and Blueprint.engine, and computes engineOnStart order.
+ * Step-introspection: reads each registration's pending params, fills in
+ * sentinel defaults, validates against paramsSchema, wires instance.params
+ * and Blueprint.engine, and computes engineOnStart order.
  */
 
 import {
@@ -18,7 +19,7 @@ import {
 
 /** Result of introspect: registrations with params resolved and start order for Blueprints. */
 export interface IntrospectionResult {
-  /** All registrations (thunks evaluated, params wired). */
+  /** All registrations (params filled and wired). */
   registrations: Registration[];
   /** Blueprints in engineOnStart order (topological by ref deps; cycles broken by registration order). */
   startOrder: Node[];
@@ -26,70 +27,11 @@ export interface IntrospectionResult {
   inputRegistry: Map<string, InputNode>;
 }
 
-/** Temporary shape for a registration plus its evaluated thunk result. */
-interface RegistrationWithResult {
-  reg: Registration;
-  thunkResult: Record<string, unknown>;
-}
-
 /**
- * Evaluates all thunks iteratively until stable (handles nested model.create).
- * Returns registration–result pairs.
- */
-function evaluateThunks(model: Model): RegistrationWithResult[] {
-  const results = new Map<string, RegistrationWithResult>();
-
-  for (;;) {
-    const regs = model.registrations;
-    let changed = false;
-
-    for (const reg of regs) {
-      if (results.has(reg.name)) continue;
-      const thunkResult = reg.thunk();
-      results.set(reg.name, { reg, thunkResult });
-      changed = true;
-    }
-
-    if (!changed) break;
-  }
-
-  return [...results.values()];
-}
-
-/**
- * Evaluates thunks only for registrations not already in `existing`.
- * Used after applyDefaults to pick up nodes created by ref default factories.
- */
-function evaluateNewThunks(
-  model: Model,
-  existing: RegistrationWithResult[],
-): RegistrationWithResult[] {
-  const known = new Set(existing.map((w) => w.reg.name));
-  const newEntries: RegistrationWithResult[] = [];
-
-  for (;;) {
-    const regs = model.registrations;
-    let changed = false;
-
-    for (const reg of regs) {
-      if (known.has(reg.name)) continue;
-      const thunkResult = reg.thunk();
-      newEntries.push({ reg, thunkResult });
-      known.add(reg.name);
-      changed = true;
-    }
-
-    if (!changed) break;
-  }
-
-  return newEntries;
-}
-
-/**
- * Fills in missing fields in a single thunkResult from sentinel defaults.
- * For ref sentinels with a defaultFactory, the factory is called to auto-create
- * the node. For primitive sentinels with defaultValue, the value is inserted
- * directly. Mutates thunkResult in place.
+ * Fills in missing fields in a registration's pendingParams from sentinel
+ * defaults. For ref sentinels with a defaultFactory, the factory is called to
+ * auto-create the referenced node. For primitive sentinels with defaultValue,
+ * the value is inserted directly. Mutates pendingParams in place.
  *
  * Exported so the dynamic spawn path can reuse the same logic.
  */
@@ -97,28 +39,25 @@ export function fillDefaults(
   model: Model,
   regName: string,
   paramsSchema: Record<string, SentinelMarker>,
-  thunkResult: Record<string, unknown>,
+  pendingParams: Record<string, unknown>,
 ): void {
   for (const [key, sentinel] of Object.entries(paramsSchema)) {
-    if (key in thunkResult) continue;
+    if (key in pendingParams) continue;
 
     if (sentinel.kind === "ref" && sentinel.defaultFactory != null) {
       // Factory receives the model and a derived name for the auto-created node.
       const created = sentinel.defaultFactory(model, `${regName}/${key}`);
-      thunkResult[key] = created;
+      pendingParams[key] = created;
     } else if ("defaultValue" in sentinel) {
-      thunkResult[key] = sentinel.defaultValue;
+      pendingParams[key] = sentinel.defaultValue;
     }
   }
 }
 
-/** Applies fillDefaults to a batch of registration-result pairs. */
-function applyDefaults(
-  model: Model,
-  withResults: RegistrationWithResult[],
-): void {
-  for (const { reg, thunkResult } of withResults) {
-    fillDefaults(model, reg.name, reg.paramsSchema, thunkResult);
+/** Applies fillDefaults to a batch of registrations. */
+function applyDefaults(model: Model, regs: Registration[]): void {
+  for (const reg of regs) {
+    fillDefaults(model, reg.name, reg.paramsSchema, reg.pendingParams);
   }
 }
 
@@ -234,14 +173,14 @@ function validateValue(
   }
 }
 
-/** Validates thunk result against paramsSchema. Throws on first mismatch. */
-function validateThunkResult(
+/** Validates pending params against paramsSchema. Throws on first mismatch. */
+function validatePendingParams(
   regName: string,
   paramsSchema: Record<string, SentinelMarker>,
-  thunkResult: Record<string, unknown>,
+  pendingParams: Record<string, unknown>,
 ): void {
   const schemaKeys = new Set(Object.keys(paramsSchema));
-  const resultKeys = new Set(Object.keys(thunkResult));
+  const resultKeys = new Set(Object.keys(pendingParams));
 
   for (const k of schemaKeys) {
     if (!resultKeys.has(k)) {
@@ -251,9 +190,8 @@ function validateThunkResult(
     }
   }
 
-  const metadataKeys = new Set(["label", "description"]);
   for (const k of resultKeys) {
-    if (!schemaKeys.has(k) && !metadataKeys.has(k)) {
+    if (!schemaKeys.has(k)) {
       throw new Error(
         `registration '${regName}', field '${k}': extra key not in paramsSchema`,
       );
@@ -261,11 +199,11 @@ function validateThunkResult(
   }
 
   for (const k of schemaKeys) {
-    validateValue(regName, k, paramsSchema[k], thunkResult[k]);
+    validateValue(regName, k, paramsSchema[k], pendingParams[k]);
   }
 }
 
-/** Collects all ref targets from a thunk result value given a sentinel. */
+/** Collects all ref targets from a params value given a sentinel. */
 function collectRefTargets(
   sentinel: SentinelMarker,
   value: unknown,
@@ -378,11 +316,11 @@ function topologicalSort(
 export function wireNode(
   instance: Node,
   name: string,
-  thunkResult: Record<string, unknown>,
+  resolvedParams: Record<string, unknown>,
   engineFacadeFactory: (name: string) => Engine,
 ): void {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- instance.params is set to resolved thunk values
-  (instance as { params?: Record<string, unknown> }).params = thunkResult;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- instance.params is declared via `declare params: typeof Self.params`; engine assigns the resolved object matching that shape
+  (instance as { params?: Record<string, unknown> }).params = resolvedParams;
   if (instance instanceof Blueprint) {
     instance.engine = engineFacadeFactory(name);
   }
@@ -392,43 +330,33 @@ export function wireNode(
 }
 
 /**
- * Evaluates all thunks, validates results, wires instance.params and Blueprint.engine,
- * and returns registrations plus engineOnStart order for Blueprints.
+ * Reads each registration's pendingParams, fills defaults (which may trigger
+ * new registrations via defaultFactory), validates, wires instance.params and
+ * Blueprint.engine, and returns registrations plus engineOnStart order.
  */
 export function introspect(
   model: Model,
   engineFacadeFactory: (name: string) => Engine,
 ): IntrospectionResult {
-  // Evaluate thunks, then apply defaults. Ref default factories may call
-  // model.create(), adding new registrations. We loop: evaluate new thunks,
-  // apply defaults to them, until no new registrations appear.
-  const withResults = evaluateThunks(model);
-  applyDefaults(model, withResults);
-
-  // Pick up registrations created by ref default factories and loop until stable.
+  // Fill defaults in a loop so ref default factories can register new nodes.
+  // Each iteration processes any registrations not yet defaulted.
+  const defaulted = new Set<Registration>();
   for (;;) {
-    const newEntries = evaluateNewThunks(model, withResults);
-    if (newEntries.length === 0) break;
-    withResults.push(...newEntries);
-    applyDefaults(model, newEntries);
+    const pending = model.registrations.filter((r) => !defaulted.has(r));
+    if (pending.length === 0) break;
+    applyDefaults(model, pending);
+    for (const r of pending) defaulted.add(r);
   }
 
-  const registrations = withResults.map((w) => w.reg);
+  const registrations = model.registrations;
 
-  // Copy label/description from thunk results onto registrations.
-  // Thunk values take precedence over opts values set during model.create().
-  for (const { reg, thunkResult } of withResults) {
-    if (typeof thunkResult.label === "string") reg.label = thunkResult.label;
-    if (typeof thunkResult.description === "string")
-      reg.description = thunkResult.description;
+  for (const reg of registrations) {
+    validatePendingParams(reg.name, reg.paramsSchema, reg.pendingParams);
   }
 
-  for (const { reg, thunkResult } of withResults) {
-    validateThunkResult(reg.name, reg.paramsSchema, thunkResult);
-  }
-
-  for (const { reg, thunkResult } of withResults) {
-    wireNode(reg.instance, reg.name, thunkResult, engineFacadeFactory);
+  for (const reg of registrations) {
+    wireNode(reg.instance, reg.name, reg.pendingParams, engineFacadeFactory);
+    reg.wired = true;
   }
 
   // Initialize InputNode instances: set value from resolved params.defaultValue
@@ -441,11 +369,9 @@ export function introspect(
   }
 
   const getDeps = (r: Registration): Registration[] => {
-    const wr = withResults.find((w) => w.reg === r);
-    if (!wr) return [];
     const targets: unknown[] = [];
     for (const [key, sentinel] of Object.entries(r.paramsSchema)) {
-      const val = wr.thunkResult[key];
+      const val = r.pendingParams[key];
       collectRefTargets(sentinel, val, targets);
     }
     const deps: Registration[] = [];

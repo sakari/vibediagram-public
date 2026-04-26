@@ -5,7 +5,7 @@ import { createTestEngine } from "./test-prng";
 
 function createWired(scale: number, shape: number, seed: string): Pareto {
   const model = createModel();
-  const dist = model.create("p", Pareto, () => ({ scale, shape }));
+  const dist = model.create("p", Pareto, { scale, shape });
   dist.engine = createTestEngine(seed);
   dist.params = { scale, shape };
   return dist;

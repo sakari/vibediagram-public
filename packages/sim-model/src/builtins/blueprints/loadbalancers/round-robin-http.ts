@@ -13,9 +13,11 @@ import {
 } from "../http-server";
 
 export class RoundRobinHttpLoadBalancer extends HttpServer {
-  params = {
+  static params = {
     backends: component.array(component.ref(HttpServer)),
   };
+
+  declare params: typeof RoundRobinHttpLoadBalancer.params;
 
   // Tracks which backend receives the next request; wraps via modulo.
   private nextIndex = 0;

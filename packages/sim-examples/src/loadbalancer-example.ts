@@ -9,12 +9,14 @@ import {
 } from "@diagram/sim-model";
 
 class Backend extends blueprints.HttpServer {
-  params = {
+  static params = {
     pool: component.ref(blueprints.ResourcePool),
     qps: component.ref(metrics.Counter, (m, name) =>
       m.create(name, metrics.Counter),
     ),
   };
+
+  declare params: typeof Backend.params;
 
   async request(): Promise<HttpResponse> {
     const ok = await this.params.pool.acquire(5);
@@ -29,14 +31,12 @@ class Backend extends blueprints.HttpServer {
 export const model = createModel();
 
 // Target request rate (requests per second), adjustable via slider
-const requestRate = model.create("request-rate", InputNode, () => ({
-  kind: "number",
-  defaultValue: 40,
-  min: 1,
-  max: 200,
-  step: 1,
-  label: "Request Rate",
-}));
+const requestRate = model.create(
+  "request-rate",
+  InputNode,
+  { kind: "number", defaultValue: 40, min: 1, max: 200, step: 1 },
+  { label: "Request Rate" },
+);
 
 // Create 2 backend servers — all params use defaults:
 // Backend: pool (ResourcePool) and qps (Counter) auto-created
@@ -44,14 +44,21 @@ const requestRate = model.create("request-rate", InputNode, () => ({
 const backends: Backend[] = [];
 for (let i = 0; i < 2; i++) {
   const id = `backend-${String(i)}`;
-  const pool = model.create(`${id}-pool`, blueprints.ResourcePool, () => ({
-    label: `Resource Pool ${String(i + 1)}`,
-  }));
-  const backend = model.create(id, Backend, () => ({
-    pool,
-    label: `Backend Server ${String(i + 1)}`,
-    description: "Processes HTTP requests using a bounded resource pool",
-  }));
+  const pool = model.create(
+    `${id}-pool`,
+    blueprints.ResourcePool,
+    {},
+    { label: `Resource Pool ${String(i + 1)}` },
+  );
+  const backend = model.create(
+    id,
+    Backend,
+    { pool },
+    {
+      label: `Backend Server ${String(i + 1)}`,
+      description: "Processes HTTP requests using a bounded resource pool",
+    },
+  );
   backends.push(backend);
 }
 
@@ -59,11 +66,11 @@ for (let i = 0; i < 2; i++) {
 const lb = model.create(
   "loadBalancer",
   blueprints.RoundRobinHttpLoadBalancer,
-  () => ({
-    backends,
+  { backends },
+  {
     label: "Load Balancer",
     description: "Distributes requests across backends using round-robin",
-  }),
+  },
 );
 
 // HTTP traffic generator — only target and rate need explicit wiring;
@@ -72,13 +79,12 @@ const lb = model.create(
 model.create(
   "trafficGenerator",
   blueprints.HttpTrafficGeneratorBlueprint,
-  () => ({
-    rate: requestRate,
-    target: lb,
+  { rate: requestRate, target: lb },
+  {
     label: "Traffic Generator",
     description:
       "Sends HTTP requests at a configurable rate using Poisson arrivals",
-  }),
+  },
 );
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ import { createTestEngine } from "./test-prng";
 
 function createWired(min: number, max: number, seed: string): Uniform {
   const model = createModel();
-  const dist = model.create("u", Uniform, () => ({ min, max }));
+  const dist = model.create("u", Uniform, { min, max });
   dist.engine = createTestEngine(seed);
   // Wire params manually (mimic introspection)
   dist.params = { min, max };

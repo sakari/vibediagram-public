@@ -2,7 +2,9 @@ import { component } from "../../sentinel";
 import { Distribution } from "../../distribution";
 
 export class Normal extends Distribution {
-  params = { mean: component.capacity(), stddev: component.capacity() };
+  static params = { mean: component.capacity(), stddev: component.capacity() };
+  declare params: typeof Normal.params;
+
   /**
    * Returns a normally distributed sample (Box-Muller transform).
    * Consumes two uniform draws per call.

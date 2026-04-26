@@ -5,7 +5,7 @@ import { createTestEngine } from "./test-prng";
 
 function createWired(mean: number, seed: string): Exponential {
   const model = createModel();
-  const dist = model.create("e", Exponential, () => ({ mean }));
+  const dist = model.create("e", Exponential, { mean });
   dist.engine = createTestEngine(seed);
   dist.params = { mean };
   return dist;

@@ -3,9 +3,10 @@ import { Blueprint, metrics, component, createModel } from "@diagram/sim-model";
 import { createEngine } from "./create-engine";
 
 class Worker extends Blueprint {
-  params = {
+  static params = {
     jobsProcessed: component.ref(metrics.Counter),
   };
+  declare params: typeof Worker.params;
 
   engineOnStart() {
     void this.processJobs();
@@ -20,9 +21,10 @@ class Worker extends Blueprint {
 }
 
 class Spawner extends Blueprint {
-  params = {
+  static params = {
     workerCount: component.ref(metrics.Gauge),
   };
+  declare params: typeof Spawner.params;
 
   private spawnIndex = 0;
 
@@ -39,12 +41,12 @@ class Spawner extends Blueprint {
       const counter = this.engine.spawn(
         `worker-${String(idx)}-jobs`,
         metrics.Counter,
-        () => ({ unit: "count" as const }),
+        { unit: "count" as const },
       );
 
-      this.engine.spawn(`worker-${String(idx)}`, Worker, () => ({
+      this.engine.spawn(`worker-${String(idx)}`, Worker, {
         jobsProcessed: counter,
-      }));
+      });
 
       this.params.workerCount.set({}, this.spawnIndex);
     }
@@ -57,9 +59,9 @@ describe("[spawn-dynamic]", () => {
     const workerCount = model.create<metrics.Gauge<"count">>(
       "workerCount",
       metrics.Gauge,
-      () => ({ unit: "count" }),
+      { unit: "count" },
     );
-    model.create("spawner", Spawner, () => ({ workerCount }));
+    model.create("spawner", Spawner, { workerCount });
 
     const engine = createEngine(model, { seed: "spawn-test", duration: 5 });
 
@@ -76,9 +78,9 @@ describe("[spawn-dynamic]", () => {
     const workerCount = model.create<metrics.Gauge<"count">>(
       "workerCount",
       metrics.Gauge,
-      () => ({ unit: "count" }),
+      { unit: "count" },
     );
-    model.create("spawner", Spawner, () => ({ workerCount }));
+    model.create("spawner", Spawner, { workerCount });
 
     let callCount = 0;
     const engine = createEngine(model, {
@@ -102,9 +104,9 @@ describe("[spawn-dynamic]", () => {
     const workerCount = model.create<metrics.Gauge<"count">>(
       "workerCount",
       metrics.Gauge,
-      () => ({ unit: "count" }),
+      { unit: "count" },
     );
-    model.create("spawner", Spawner, () => ({ workerCount }));
+    model.create("spawner", Spawner, { workerCount });
 
     const engine = createEngine(model, { seed: "spawn-metrics", duration: 5 });
     await engine.run();
@@ -119,9 +121,9 @@ describe("[spawn-dynamic]", () => {
     const workerCount = model.create<metrics.Gauge<"count">>(
       "workerCount",
       metrics.Gauge,
-      () => ({ unit: "count" }),
+      { unit: "count" },
     );
-    model.create("spawner", Spawner, () => ({ workerCount }));
+    model.create("spawner", Spawner, { workerCount });
 
     const engine = createEngine(model, { seed: "spawn-facade", duration: 5 });
     await engine.run();
@@ -141,9 +143,9 @@ describe("[spawn-dynamic]", () => {
     const workerCount = model.create<metrics.Gauge<"count">>(
       "workerCount",
       metrics.Gauge,
-      () => ({ unit: "count" }),
+      { unit: "count" },
     );
-    model.create("spawner", Spawner, () => ({ workerCount }));
+    model.create("spawner", Spawner, { workerCount });
 
     const engine = createEngine(model, { seed: "no-cb" });
     // Should not throw even without onTopologyChange
@@ -155,9 +157,9 @@ describe("[spawn-dynamic]", () => {
     const workerCount = model.create<metrics.Gauge<"count">>(
       "workerCount",
       metrics.Gauge,
-      () => ({ unit: "count" }),
+      { unit: "count" },
     );
-    model.create("spawner", Spawner, () => ({ workerCount }));
+    model.create("spawner", Spawner, { workerCount });
 
     const engine = createEngine(model, { seed: "spawn-edges", duration: 5 });
     await engine.run();
@@ -172,7 +174,6 @@ describe("[spawn-dynamic]", () => {
 
   it("spawn without thunk uses sentinel defaults", async () => {
     class DefaultSpawner extends Blueprint {
-      params = {};
       engineOnStart() {
         // No thunk — Counter's sentinel defaults provide unit: "count"
         this.engine.spawn("auto-counter", metrics.Counter);
@@ -180,7 +181,7 @@ describe("[spawn-dynamic]", () => {
     }
 
     const model = createModel();
-    model.create("defaultSpawner", DefaultSpawner, () => ({}));
+    model.create("defaultSpawner", DefaultSpawner, {});
 
     const engine = createEngine(model, { seed: "default-spawn", duration: 1 });
     await engine.step();
@@ -199,19 +200,18 @@ describe("[spawn-dynamic]", () => {
   it("onTopologyChange batches multiple spawns in same tick", async () => {
     // This spawner creates two nodes in the same engineOnStart (no await between)
     class BatchSpawner extends Blueprint {
-      params = {};
       engineOnStart() {
-        this.engine.spawn("a-counter", metrics.Counter, () => ({
+        this.engine.spawn("a-counter", metrics.Counter, {
           unit: "count" as const,
-        }));
-        this.engine.spawn("b-counter", metrics.Counter, () => ({
+        });
+        this.engine.spawn("b-counter", metrics.Counter, {
           unit: "count" as const,
-        }));
+        });
       }
     }
 
     const model = createModel();
-    model.create("batchSpawner", BatchSpawner, () => ({}));
+    model.create("batchSpawner", BatchSpawner, {});
 
     const cb = vi.fn();
     const engine = createEngine(model, {
@@ -228,6 +228,56 @@ describe("[spawn-dynamic]", () => {
     expect(engine.registrations).toHaveLength(3);
     expect(engine.registrations.map((r) => r.name)).toEqual(
       expect.arrayContaining(["batchSpawner", "a-counter", "b-counter"]),
+    );
+  });
+
+  it("wire() on a node returned from engine.spawn throws — spawned nodes are wired immediately", async () => {
+    class Spawner extends Blueprint {
+      spawned: metrics.Counter | undefined;
+      engineOnStart() {
+        this.spawned = this.engine.spawn("c1", metrics.Counter, {
+          unit: "count" as const,
+        });
+      }
+    }
+
+    const model = createModel();
+    const spawner = model.create("spawner", Spawner, {});
+
+    const engine = createEngine(model, { seed: "wire-spawn" });
+    await engine.step();
+
+    expect(spawner.spawned).toBeDefined();
+    // engine.spawn marks `wired = true` immediately after wireNode, so any
+    // subsequent .wire() call must throw — dynamic wiring during simulation
+    // belongs in engine.spawn(), not in .wire().
+    expect(() => spawner.spawned!.wire({ unit: "count" as const })).toThrow(
+      /already wired/,
+    );
+  });
+
+  it("wire() on a statically registered node throws after createEngine has run", () => {
+    class Producer extends Blueprint {
+      static params = {
+        sink: component.ref(metrics.Counter),
+      };
+      declare params: typeof Producer.params;
+    }
+
+    const model = createModel();
+    const sink = model.create<metrics.Counter<"count">>(
+      "sink",
+      metrics.Counter,
+      { unit: "count" as const },
+    );
+    const producer = model.create("producer", Producer, { sink });
+
+    createEngine(model, { seed: "wire-after-introspect" });
+
+    // Both registrations are wired by introspect; .wire() must throw on either.
+    expect(() => producer.wire({ sink })).toThrow(/already wired/);
+    expect(() => sink.wire({ unit: "count" as const })).toThrow(
+      /already wired/,
     );
   });
 });

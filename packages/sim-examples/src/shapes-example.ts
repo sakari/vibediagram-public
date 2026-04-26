@@ -12,25 +12,28 @@ import {
 
 /** A blueprint that owns a metric, turning it into a group node. */
 class GroupBlueprint extends Blueprint {
-  params = {
+  static params = {
     counter: component.ref(metrics.Counter),
   };
+
+  declare params: typeof GroupBlueprint.params;
 
   engineOnStart() {}
 }
 
 /** A blueprint that references another node, creating an edge in the topology. */
 class ConnectedBlueprint extends Blueprint {
-  params = {
+  static params = {
     target: component.ref(Blueprint),
   };
+
+  declare params: typeof ConnectedBlueprint.params;
 
   engineOnStart() {}
 }
 
 /** Minimal blueprint with no params. */
 class LeafBlueprint extends Blueprint {
-  params = {};
   engineOnStart() {}
 }
 
@@ -42,49 +45,60 @@ const groupCounter = model.create("groupCounter", metrics.Counter);
 // --- Nodes — one per shape ----------------------------------------------------
 
 // Leaf nodes (no outgoing edges from params)
-const cylinderNode = model.create("cylinder-node", LeafBlueprint, () => ({
-  label: "Cylinder",
-}));
+const cylinderNode = model.create(
+  "cylinder-node",
+  LeafBlueprint,
+  {},
+  { label: "Cylinder" },
+);
 
-const circleNode = model.create("circle-node", LeafBlueprint, () => ({
-  label: "Circle",
-}));
+const circleNode = model.create(
+  "circle-node",
+  LeafBlueprint,
+  {},
+  { label: "Circle" },
+);
 
-const hexagonNode = model.create("hexagon-node", LeafBlueprint, () => ({
-  label: "Hexagon",
-}));
+const hexagonNode = model.create(
+  "hexagon-node",
+  LeafBlueprint,
+  {},
+  { label: "Hexagon" },
+);
 
 // Connected nodes — each references a leaf, creating an edge
 const rectangleNode = model.create(
   "rectangle-node",
   ConnectedBlueprint,
-  () => ({
-    target: cylinderNode,
-    label: "Rectangle",
-  }),
+  { target: cylinderNode },
+  { label: "Rectangle" },
 );
 
 const roundedRectNode = model.create(
   "rounded-rect-node",
   ConnectedBlueprint,
-  () => ({
-    target: circleNode,
-    label: "Rounded Rectangle",
-  }),
+  { target: circleNode },
+  { label: "Rounded Rectangle" },
 );
 
-const diamondNode = model.create("diamond-node", ConnectedBlueprint, () => ({
-  target: hexagonNode,
-  label: "Diamond",
-}));
+const diamondNode = model.create(
+  "diamond-node",
+  ConnectedBlueprint,
+  { target: hexagonNode },
+  { label: "Diamond" },
+);
 
 // --- Group node (owns a metric) -----------------------------------------------
 // The group references the rectangle node to create another edge
-model.create("group-node", GroupBlueprint, () => ({
-  counter: groupCounter,
-  label: "Group (rectangle)",
-  description: "A group node that owns a counter metric",
-}));
+model.create(
+  "group-node",
+  GroupBlueprint,
+  { counter: groupCounter },
+  {
+    label: "Group (rectangle)",
+    description: "A group node that owns a counter metric",
+  },
+);
 
 // Suppress unused-variable warnings for leaf nodes
 void rectangleNode;

@@ -10,10 +10,12 @@ import { Summary } from "../../metric";
 import { component } from "../../sentinel";
 
 export class LatencyBlueprint extends Blueprint {
-  params = {
+  static params = {
     latency: component.ref(Distribution),
     metrics: component.ref(Summary),
   };
+
+  declare params: typeof LatencyBlueprint.params;
 
   /**
    * Samples the wired distribution, scales by utilization, records the

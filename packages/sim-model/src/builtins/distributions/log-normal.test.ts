@@ -5,7 +5,7 @@ import { createTestEngine } from "./test-prng";
 
 function createWired(mu: number, sigma: number, seed: string): LogNormal {
   const model = createModel();
-  const dist = model.create("ln", LogNormal, () => ({ mu, sigma }));
+  const dist = model.create("ln", LogNormal, { mu, sigma });
   dist.engine = createTestEngine(seed);
   dist.params = { mu, sigma };
   return dist;

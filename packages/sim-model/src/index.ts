@@ -31,7 +31,14 @@ export {
 } from "./builtins/blueprints/http-server";
 export { Distribution } from "./distribution";
 export { distributions, metrics, blueprints } from "./builtins";
-export { createModel, Model, type Registration } from "./model";
+export {
+  createModel,
+  Model,
+  type Registration,
+  type NodeClass,
+  type StaticParamsOf,
+  type InstanceParams,
+} from "./model";
 export type {
   StyleRuleDescriptor,
   StyleDescriptor,

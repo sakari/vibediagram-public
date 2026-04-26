@@ -18,13 +18,14 @@ export interface ModelLike {
   create<T extends Node>(
     name: string,
     Class: new () => T,
-    thunk?: () => Record<string, unknown>,
+    params?: Record<string, unknown>,
+    opts?: { label?: string; description?: string },
   ): T;
 }
 
 /**
  * Factory callback that auto-creates a node when a ref field is missing from
- * the thunk result. Called during introspection with the model instance and
+ * the create() call. Called during introspection with the model instance and
  * the derived name for the new node.
  */
 export type DefaultFactory = (model: ModelLike, name: string) => unknown;
@@ -130,16 +131,60 @@ const marker = (
  * this lie is established — they cannot be avoided without changing the API.
  */
 export const component = {
-  /** Reference to another node class. Resolves to InstanceType of that class. Optionally accepts a factory to auto-create the node when the thunk omits this field. */
+  /**
+   * Reference to another node class. Resolves to InstanceType of that class.
+   * Optionally accepts a factory to auto-create the node when the caller
+   * omits this field.
+   *
+   * The target may be passed as either the class itself or an arrow thunk
+   * returning the class — the thunk form is required when two classes
+   * reference each other in their static params, since the second class
+   * would otherwise be used before declaration.
+   *
+   * **Use an arrow function**, not a regular `function` expression, for the
+   * lazy form. The runtime distinguishes the two by the absence of
+   * `.prototype` on arrow functions; a `function` expression has a
+   * `.prototype` and would be mistaken for a class itself, leading to a
+   * confusing `instanceof` validation error at introspection time.
+   */
   ref<T extends abstract new (...args: unknown[]) => unknown>(
-    target: T,
+    target: T | (() => T),
     defaultFactory?: DefaultFactory,
   ): InstanceType<T> {
+    // Thunks (arrow functions) have no .prototype; classes do. Detect and
+    // lazily resolve so callers can write `component.ref(() => OtherClass)`
+    // for forward references. Use Reflect.get to probe the optional
+    // property without narrowing the union type.
+    const hasPrototype =
+      typeof target === "function" &&
+      Reflect.get(target, "prototype") !== undefined;
+    const isLazy = !hasPrototype;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- isLazy=false means target is T (a class), not a thunk
+    let cached: T | undefined = isLazy ? undefined : (target as T);
+    const resolveTarget = (): T => {
+      if (cached === undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- narrowed by isLazy branch above
+        cached = (target as () => T)();
+      }
+      return cached;
+    };
+
+    // Build a frozen sentinel with `target` backed by a getter so the
+    // resolution is deferred until the engine reads it.
+    const sentinel: Record<string | symbol, unknown> = {
+      [SENTINEL]: true as const,
+      kind: "ref" as const,
+    };
+    Object.defineProperty(sentinel, "target", {
+      get: resolveTarget,
+      enumerable: true,
+      configurable: false,
+    });
+    if (defaultFactory !== undefined) {
+      sentinel.defaultFactory = defaultFactory;
+    }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- intentional lie: sentinel stands in for resolved instance type at declaration time
-    return marker("ref", {
-      target,
-      defaultFactory,
-    }) as unknown as InstanceType<T>;
+    return Object.freeze(sentinel) as unknown as InstanceType<T>;
   },
 
   /** Capacity semantic: pool size, buffer size. Resolves to number. Optionally accepts a default value. */

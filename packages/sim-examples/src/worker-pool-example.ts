@@ -26,30 +26,37 @@ interface Task {
  * exist skip the buffer and go directly to a waiter.
  */
 class Queue extends Blueprint {
-  params = {
+  static params = {
     depth: component.ref(metrics.Gauge, (m, name) =>
-      m.create(name, metrics.Gauge, () => ({
-        unit: "count" as const,
-        description: "Current number of buffered tasks in the queue",
-      })),
+      m.create(
+        name,
+        metrics.Gauge,
+        { unit: "count" as const },
+        { description: "Current number of buffered tasks in the queue" },
+      ),
     ),
     capacity: component.ref(InputNode, (m, name) =>
-      m.create(name, InputNode, () => ({
-        kind: "number",
-        defaultValue: 100,
-        min: 1,
-        max: 1000,
-        step: 1,
-        label: "Queue Capacity",
-        description: "Maximum buffered tasks before new arrivals are dropped",
-      })),
+      m.create(
+        name,
+        InputNode,
+        { kind: "number", defaultValue: 100, min: 1, max: 1000, step: 1 },
+        {
+          label: "Queue Capacity",
+          description: "Maximum buffered tasks before new arrivals are dropped",
+        },
+      ),
     ),
     dropped: component.ref(metrics.Counter, (m, name) =>
-      m.create(name, metrics.Counter, () => ({
-        description: "Tasks dropped because the queue was at capacity",
-      })),
+      m.create(
+        name,
+        metrics.Counter,
+        {},
+        { description: "Tasks dropped because the queue was at capacity" },
+      ),
     ),
   };
+
+  declare params: typeof Queue.params;
 
   private items: Task[] = [];
   private waiters: Array<(task: Task) => void> = [];
@@ -89,20 +96,31 @@ class Queue extends Blueprint {
  * matching the convention used by HttpTrafficGeneratorBlueprint.
  */
 class Producer extends Blueprint {
-  params = {
+  static params = {
     queue: component.ref(Queue),
     rate: component.ref(InputNode),
     arrivalDistribution: component.ref(Distribution, (m, name) =>
-      m.create(name, distributions.Exponential, () => ({
-        description: "Unit-mean exponential used to sample inter-arrival times",
-      })),
+      m.create(
+        name,
+        distributions.Exponential,
+        {},
+        {
+          description:
+            "Unit-mean exponential used to sample inter-arrival times",
+        },
+      ),
     ),
     produced: component.ref(metrics.Counter, (m, name) =>
-      m.create(name, metrics.Counter, () => ({
-        description: "Total tasks emitted by the producer",
-      })),
+      m.create(
+        name,
+        metrics.Counter,
+        {},
+        { description: "Total tasks emitted by the producer" },
+      ),
     ),
   };
+
+  declare params: typeof Producer.params;
 
   private nextId = 0;
 
@@ -129,20 +147,28 @@ class Producer extends Blueprint {
  * (1 = busy, 0 = idle) that style rules key off of.
  */
 class Worker extends Blueprint {
-  params = {
+  static params = {
     queue: component.ref(Queue),
     serviceTime: component.ref(InputNode),
     processed: component.ref(metrics.Counter, (m, name) =>
-      m.create(name, metrics.Counter, () => ({
-        description: "Tasks this worker has finished processing",
-      })),
+      m.create(
+        name,
+        metrics.Counter,
+        {},
+        { description: "Tasks this worker has finished processing" },
+      ),
     ),
     status: component.ref(metrics.Gauge, (m, name) =>
-      m.create(name, metrics.Gauge, () => ({
-        description: "Worker busy state: 1 while processing, 0 when idle",
-      })),
+      m.create(
+        name,
+        metrics.Gauge,
+        {},
+        { description: "Worker busy state: 1 while processing, 0 when idle" },
+      ),
     ),
   };
+
+  declare params: typeof Worker.params;
 
   engineOnStart() {
     this.params.status.set({}, 0);
@@ -171,17 +197,24 @@ class Worker extends Blueprint {
  * short timescales — scale-down is slow, scale-up is fast.
  */
 class Supervisor extends Blueprint {
-  params = {
+  static params = {
     queue: component.ref(Queue),
     serviceTime: component.ref(InputNode),
     spawnThreshold: component.ref(InputNode),
     maxWorkers: component.ref(InputNode),
     workerCount: component.ref(metrics.Gauge, (m, name) =>
-      m.create(name, metrics.Gauge, () => ({
-        description: "Number of workers currently spawned by the supervisor",
-      })),
+      m.create(
+        name,
+        metrics.Gauge,
+        {},
+        {
+          description: "Number of workers currently spawned by the supervisor",
+        },
+      ),
     ),
   };
+
+  declare params: typeof Supervisor.params;
 
   private workers = 0;
 
@@ -193,11 +226,10 @@ class Supervisor extends Blueprint {
   private spawnWorker(): void {
     this.workers++;
     const idx = this.workers;
-    this.engine.spawn(`worker-${String(idx)}`, Worker, () => ({
+    this.engine.spawn(`worker-${String(idx)}`, Worker, {
       queue: this.params.queue,
       serviceTime: this.params.serviceTime,
-      description: "Pulls tasks from the queue and processes them serially",
-    }));
+    });
     this.params.workerCount.set({}, this.workers);
   }
 
@@ -232,71 +264,78 @@ export function buildModel() {
 
   // Starts at 1 task/s so one worker can easily keep up — drag this up
   // to see the queue back up and the supervisor spawn more workers.
-  const arrivalRate = model.create("arrivalRate", InputNode, () => ({
-    kind: "number",
-    defaultValue: 1,
-    min: 1,
-    max: 500,
-    step: 1,
-    label: "Arrival Rate (tasks/s)",
-    description:
-      "Mean rate of Poisson task arrivals. Raise this to back the queue up.",
-  }));
+  const arrivalRate = model.create(
+    "arrivalRate",
+    InputNode,
+    { kind: "number", defaultValue: 1, min: 1, max: 500, step: 1 },
+    {
+      label: "Arrival Rate (tasks/s)",
+      description:
+        "Mean rate of Poisson task arrivals. Raise this to back the queue up.",
+    },
+  );
 
-  const serviceTime = model.create("serviceTime", InputNode, () => ({
-    kind: "number",
-    defaultValue: 0.2,
-    min: 0.01,
-    max: 2,
-    step: 0.01,
-    label: "Service Time (s)",
-    description: "How long each worker takes to process a single task",
-  }));
+  const serviceTime = model.create(
+    "serviceTime",
+    InputNode,
+    { kind: "number", defaultValue: 0.2, min: 0.01, max: 2, step: 0.01 },
+    {
+      label: "Service Time (s)",
+      description: "How long each worker takes to process a single task",
+    },
+  );
 
-  const spawnThreshold = model.create("spawnThreshold", InputNode, () => ({
-    kind: "number",
-    defaultValue: 5,
-    min: 1,
-    max: 100,
-    step: 1,
-    label: "Depth to Spawn Worker",
-    description:
-      "Queue depth that triggers the supervisor to spawn another worker",
-  }));
+  const spawnThreshold = model.create(
+    "spawnThreshold",
+    InputNode,
+    { kind: "number", defaultValue: 5, min: 1, max: 100, step: 1 },
+    {
+      label: "Depth to Spawn Worker",
+      description:
+        "Queue depth that triggers the supervisor to spawn another worker",
+    },
+  );
 
   // Starts at 1 — the supervisor never spawns beyond this until the user
   // raises the cap. Pair with the low arrival rate above: on first run
   // you see a single worker comfortably draining a trickle of tasks, then
   // you crank up Arrival Rate, watch the queue grow, then raise Max
   // Workers and watch new workers spawn to catch up.
-  const maxWorkers = model.create("maxWorkers", InputNode, () => ({
-    kind: "number",
-    defaultValue: 1,
-    min: 1,
-    max: 20,
-    step: 1,
-    label: "Max Workers",
-    description: "Hard cap on how many workers the supervisor may spawn",
-  }));
+  const maxWorkers = model.create(
+    "maxWorkers",
+    InputNode,
+    { kind: "number", defaultValue: 1, min: 1, max: 20, step: 1 },
+    {
+      label: "Max Workers",
+      description: "Hard cap on how many workers the supervisor may spawn",
+    },
+  );
 
-  const queue = model.create("queue", Queue, () => ({
-    description: "FIFO work queue drained by a dynamic pool of workers",
-  }));
+  const queue = model.create(
+    "queue",
+    Queue,
+    {},
+    { description: "FIFO work queue drained by a dynamic pool of workers" },
+  );
 
-  model.create("producer", Producer, () => ({
-    queue,
-    rate: arrivalRate,
-    description: "Emits tasks using Poisson arrivals at the configured rate",
-  }));
+  model.create(
+    "producer",
+    Producer,
+    { queue, rate: arrivalRate },
+    {
+      description: "Emits tasks using Poisson arrivals at the configured rate",
+    },
+  );
 
-  model.create("supervisor", Supervisor, () => ({
-    queue,
-    serviceTime,
-    spawnThreshold,
-    maxWorkers,
-    description:
-      "Spawns a new worker whenever the queue depth exceeds the threshold",
-  }));
+  model.create(
+    "supervisor",
+    Supervisor,
+    { queue, serviceTime, spawnThreshold, maxWorkers },
+    {
+      description:
+        "Spawns a new worker whenever the queue depth exceeds the threshold",
+    },
+  );
 
   model.addStyleRules(styles);
   return model;

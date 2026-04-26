@@ -35,47 +35,45 @@ import { Exponential } from "../distributions/exponential";
 /**
  * Default factory that creates an InputNode with the given params.
  * Used by ResourcePool sentinel defaults to auto-create inputs when
- * the caller omits them from the thunk.
+ * the caller omits them.
  */
-function inputFactory(
-  params: () => {
-    kind: string;
-    defaultValue: number;
-    min: number;
-    max: number;
-    step: number;
-  },
-): DefaultFactory {
+function inputFactory(params: {
+  kind: string;
+  defaultValue: number;
+  min: number;
+  max: number;
+  step: number;
+}): DefaultFactory {
   return (m, name) => m.create(name, InputNode, params);
 }
 
 export class ResourcePool extends Blueprint {
-  params = {
+  static params = {
     capacity: component.ref(
       InputNode,
-      inputFactory(() => ({
+      inputFactory({
         kind: "number",
         defaultValue: 10,
         min: 1,
         max: 100,
         step: 1,
-      })),
+      }),
     ),
     latency: component.ref(Distribution, (m, name) =>
-      m.create(name, Exponential, () => ({ mean: 0.005 })),
+      m.create(name, Exponential, { mean: 0.005 }),
     ),
     scalingExponent: component.ref(
       InputNode,
-      inputFactory(() => ({
+      inputFactory({
         kind: "number",
         defaultValue: 1,
         min: 0.1,
         max: 5,
         step: 0.1,
-      })),
+      }),
     ),
     utilization: component.ref(Gauge, (m, name) =>
-      m.create(name, Gauge, () => ({ unit: "ratio" })),
+      m.create(name, Gauge, { unit: "ratio" }),
     ),
     concurrentRequests: component.ref(Gauge, (m, name) =>
       m.create(name, Gauge),
@@ -84,6 +82,8 @@ export class ResourcePool extends Blueprint {
       m.create(name, Summary),
     ),
   };
+
+  declare params: typeof ResourcePool.params;
 
   private active = 0;
   private waitQueue: Array<() => void> = [];

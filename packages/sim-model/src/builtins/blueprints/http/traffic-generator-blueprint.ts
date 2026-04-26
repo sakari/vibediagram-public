@@ -25,7 +25,7 @@ import { HttpServer } from "../http-server";
  * naturally.
  */
 export class HttpTrafficGeneratorBlueprint extends Blueprint {
-  params = {
+  static params = {
     /** Distribution for inter-arrival times. Defaults to Exponential(mean=1) for Poisson arrivals. */
     arrivalDistribution: component.ref(Distribution, (m, name) =>
       m.create(name, Exponential),
@@ -39,6 +39,8 @@ export class HttpTrafficGeneratorBlueprint extends Blueprint {
     /** The target HttpServer that receives requests (creates a topology edge). No default — must be wired. */
     target: component.ref(HttpServer),
   };
+
+  declare params: typeof HttpTrafficGeneratorBlueprint.params;
 
   /** Starts the arrival loop when the engine begins. */
   engineOnStart(): void {

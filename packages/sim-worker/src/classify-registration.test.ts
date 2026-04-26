@@ -24,11 +24,12 @@ function makeBlueprint(
 ): Registration {
   return {
     instance: new (class TestBlueprint extends Blueprint {})(),
-    thunk: () => ({}),
+    pendingParams: {},
     paramsSchema: {},
     frameworkSentinels: [],
     className: "TestBlueprint",
     spawnChildren: [],
+    wired: false,
     ...overrides,
   };
 }
@@ -39,11 +40,12 @@ function makeInputNode(
 ): Registration {
   return {
     instance: new InputNode(),
-    thunk: () => ({}),
+    pendingParams: {},
     paramsSchema: {},
     frameworkSentinels: [],
     className: "InputNode",
     spawnChildren: [],
+    wired: false,
     ...overrides,
   };
 }

@@ -1,45 +1,24 @@
 /**
- * Step-model-builder: creates and registers nodes, scans for sentinels in params
- * and framework fields. The model collects registrations for later resolution
- * by the engine package.
+ * Step-model-builder: creates and registers nodes, reads the static params
+ * schema from each Node subclass, and collects registrations for later
+ * resolution by the engine package. Framework sentinels declared outside
+ * `params` (e.g. on instance fields) are scanned from the instance.
  */
 
 import { Blueprint } from "./blueprint";
-import { Node } from "./node";
+import {
+  Node,
+  bindPending,
+  type InstanceParams,
+  type NodeClass,
+  type StaticParamsOf,
+} from "./node";
 import { isSentinel, type SentinelMarker } from "./sentinel";
 import type { StyleRuleDescriptor } from "./style-rule-descriptor";
 
-/** Maps a class's params type to the resolved shape. Node has no params; subclasses may extend. */
-type ParamsOf<T extends Node> = T extends { params: infer P }
-  ? P
-  : Record<string, never>;
-
-/**
- * Widens string-literal unions to plain string so that thunk return values
- * like `{ unit: "byte" }` (inferred as `{ unit: string }`) are accepted
- * without requiring `as const` or explicit casts. Non-string properties
- * (numbers, node refs) are left unchanged.
- */
-type WidenStrings<T> = {
-  [K in keyof T]: T[K] extends string ? string : T[K];
-};
-
-/**
- * Thunk return type for model.create(). When ParamsOf can infer the params
- * shape, the thunk is type-checked against it (with string unions widened).
- * When inference falls back to Record<string, never> (e.g. bare Node), we
- * accept any object. label and description are always accepted for metadata.
- */
-type ThunkResult<T extends Node> = (ParamsOf<T> extends Record<string, never>
-  ? Record<string, unknown>
-  : Partial<WidenStrings<ParamsOf<T>>>) & {
-  label?: string;
-  description?: string;
-};
-
 /**
  * Stored metadata for a node registered via model.create. Used by the engine
- * package to resolve thunk values into instance properties.
+ * package to resolve pending-params values into instance properties.
  */
 export interface Registration {
   /** Node name set at registration. */
@@ -50,11 +29,22 @@ export interface Registration {
   description?: string;
   /** The node instance (params still hold sentinels until resolution). */
   instance: Node;
-  /** Thunk that supplies resolved values; return shape must match paramsSchema. */
-  thunk: () => Record<string, unknown>;
+  /**
+   * Params supplied via create() and subsequent .set() calls. Mutable until
+   * introspection runs; the engine reads from this object, fills in missing
+   * keys from sentinel defaults, and assigns the resolved object onto
+   * instance.params.
+   */
+  pendingParams: Record<string, unknown>;
+  /**
+   * Set to true by the engine once this registration has been wired. After
+   * wiring, `.set()` on the instance throws rather than silently mutating
+   * state that nothing reads.
+   */
+  wired: boolean;
   /** Top-level keys of params and their sentinel markers (no recursion into composites). */
   paramsSchema: Record<string, SentinelMarker>;
-  /** Own properties (excluding params, name) that hold sentinel values. */
+  /** Own instance properties (excluding params, name) that hold sentinel values. */
   frameworkSentinels: Array<{ path: string; sentinel: SentinelMarker }>;
   /** Constructor name for diagnostics. */
   className: string;
@@ -64,8 +54,14 @@ export interface Registration {
   defaultInstanceStyleRules?: readonly StyleRuleDescriptor[];
 }
 
-/** Scan an instance for sentinel markers in params and own properties. */
-function scanSentinels(instance: Node): {
+/**
+ * Reads the static params schema from a Node subclass (no instantiation)
+ * and records any framework sentinels found on the instance's own fields.
+ */
+function scanSchema(
+  Class: NodeClass,
+  instance: Node,
+): {
   paramsSchema: Record<string, SentinelMarker>;
   frameworkSentinels: Array<{ path: string; sentinel: SentinelMarker }>;
 } {
@@ -75,22 +71,16 @@ function scanSentinels(instance: Node): {
     sentinel: SentinelMarker;
   }> = [];
 
-  const instanceEntries = Object.entries(instance as object);
-  const paramsEntry = instanceEntries.find(([k]) => k === "params");
-  const rawParams: unknown = paramsEntry?.[1];
-  if (
-    rawParams !== null &&
-    typeof rawParams === "object" &&
-    !Array.isArray(rawParams)
-  ) {
-    for (const [key, value] of Object.entries(rawParams)) {
+  const staticParams = Class.params;
+  if (staticParams != null) {
+    for (const [key, value] of Object.entries(staticParams)) {
       if (isSentinel(value)) {
         paramsSchema[key] = value;
       }
     }
   }
 
-  for (const [key, value] of instanceEntries) {
+  for (const [key, value] of Object.entries(instance as object)) {
     if (key === "params" || key === "name") continue;
     if (isSentinel(value)) {
       frameworkSentinels.push({ path: key, sentinel: value });
@@ -101,30 +91,54 @@ function scanSentinels(instance: Node): {
 }
 
 /**
- * Model builder that creates nodes, scans for sentinels, and stores registrations
- * for later resolution. Use createModel() to obtain an instance.
+ * Model builder that creates nodes, reads their static param schemas, and
+ * stores registrations for later resolution. Use createModel() to obtain an
+ * instance.
  */
 export class Model {
   private _registrations: Registration[] = [];
   private _styleRules: StyleRuleDescriptor[] = [];
 
   /**
-   * Creates a node instance, sets its name, scans for sentinels, and stores the
-   * registration. Returns the instance; sentinels remain until the engine resolves them.
+   * Creates a node instance, sets its name, reads the static params schema,
+   * scans for framework sentinels, and stores the registration. Returns the
+   * instance; the engine resolves params during introspection.
    *
-   * Every node must go through model.create() to be registered. Only sentinel
-   * fields declared in `params` (via component.ref(), etc.) contribute to the
-   * visible topology graph. Private instance fields that reference other nodes
-   * create hidden dependencies invisible to the framework and UI layout. This is
-   * intentional — `params` is the explicit contract for external visibility.
+   * Every node must go through model.create() to be registered. Only
+   * sentinel fields declared in `static params` contribute to the visible
+   * topology graph. Private instance fields that reference other nodes
+   * create hidden dependencies invisible to the framework and UI layout —
+   * `params` is the explicit contract for external visibility.
+   *
+   * The optional `params` arg may supply any subset of the resolved params
+   * shape; missing keys are filled by sentinel defaults or by subsequent
+   * `.set()` calls. For circular refs, omit the circular key at creation
+   * and call `.set({ key: otherNode })` after the other node is created.
+   *
+   * The `InstanceType<C>` cast on `new Class()` is a typed internal bridge
+   * between the generic `C` and the concrete instance returned by `new` —
+   * a known TS limitation when the generic is constrained via an
+   * interface rather than a bare constructor type. It is not equivalent
+   * to `any`: the compiler has already verified that `C` has a zero-arg
+   * constructor returning Node.
    */
   create<T extends Node>(
     name: string,
-    Class: new () => T,
-    thunk?: () => ThunkResult<T>,
+    Class: NodeClass<T>,
+    params?: Partial<InstanceParams<T>>,
     opts?: { label?: string; description?: string },
   ): T {
-    const instance = new Class();
+    // Reject duplicate names eagerly. Without this, a second create() with
+    // the same name would push a parallel registration that the engine's
+    // first-match lookup never finds — silently breaking wire() on the
+    // second instance and engine.spawn's wired flag for it.
+    if (this._registrations.some((r) => r.name === name)) {
+      throw new Error(
+        `Model.create: duplicate name '${name}' (each registration must have a unique name)`,
+      );
+    }
+
+    const instance: T = new Class();
     instance.name = name;
 
     // Collect per-instance default style rules before params are resolved.
@@ -136,27 +150,26 @@ export class Model {
       }
     }
 
-    const { paramsSchema, frameworkSentinels } = scanSentinels(instance);
+    const { paramsSchema, frameworkSentinels } = scanSchema(Class, instance);
 
-    // Default to empty-object thunk when caller omits it (ref defaultFactory
-    // or primitive defaultValue will fill in the missing fields during introspection).
-    const emptyThunk = () => ({}) as Record<string, unknown>;
-    const resolvedThunk =
-      (thunk as (() => Record<string, unknown>) | undefined) ?? emptyThunk;
+    const pendingParams: Record<string, unknown> =
+      params === undefined ? {} : { ...(params as Record<string, unknown>) };
 
     const registration: Registration = {
       name,
       label: opts?.label,
       description: opts?.description,
       instance,
-      thunk: resolvedThunk,
+      pendingParams,
       paramsSchema,
       frameworkSentinels,
       className: Class.name,
       spawnChildren: [],
       defaultInstanceStyleRules: instanceStyleRules,
+      wired: false,
     };
     this._registrations.push(registration);
+    bindPending(instance, registration);
 
     return instance;
   }
@@ -187,3 +200,6 @@ export class Model {
 export function createModel(): Model {
   return new Model();
 }
+
+/** Re-export for callers that want to type custom helpers against the resolved params shape. */
+export type { InstanceParams, NodeClass, StaticParamsOf };

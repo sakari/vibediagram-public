@@ -1,4 +1,4 @@
-import { Node } from "./node";
+import { Node, type InstanceParams, type NodeClass } from "./node";
 import type { StyleRuleDescriptor } from "./style-rule-descriptor";
 
 /**
@@ -35,11 +35,14 @@ export class Engine {
    * is a Blueprint — so any timeouts it schedules start from the current
    * simulation time. Topology update notifications are batched via microtask
    * and delivered before the next event is processed.
+   *
+   * `params` is a partial of the resolved static-params shape; missing keys
+   * are filled from sentinel defaults.
    */
   spawn<T extends Node>(
     _name: string,
-    _Class: new () => T,
-    _thunk?: () => Record<string, unknown>,
+    _Class: NodeClass<T>,
+    _params?: Partial<InstanceParams<T>>,
   ): T {
     throw new Error("Engine not wired — call createEngine() first");
   }

@@ -11,9 +11,9 @@ random number generation.
 Memoryless distribution, commonly used for inter-arrival times.
 
 ```typescript
-const dist = model.create("arrivalDist", distributions.Exponential, () => ({
+const dist = model.create("arrivalDist", distributions.Exponential, {
   mean: 0.01, // average value
-}));
+});
 ```
 
 ### Uniform
@@ -21,10 +21,10 @@ const dist = model.create("arrivalDist", distributions.Exponential, () => ({
 Equal probability across a range.
 
 ```typescript
-const dist = model.create("jitter", distributions.Uniform, () => ({
+const dist = model.create("jitter", distributions.Uniform, {
   min: 0.001,
   max: 0.005,
-}));
+});
 ```
 
 ### Normal (Gaussian)
@@ -32,10 +32,10 @@ const dist = model.create("jitter", distributions.Uniform, () => ({
 Bell curve distribution.
 
 ```typescript
-const dist = model.create("latency", distributions.Normal, () => ({
+const dist = model.create("latency", distributions.Normal, {
   mean: 0.05,
   stddev: 0.01,
-}));
+});
 ```
 
 ### LogNormal
@@ -43,10 +43,10 @@ const dist = model.create("latency", distributions.Normal, () => ({
 Skewed distribution, useful for latency modeling.
 
 ```typescript
-const dist = model.create("responseTime", distributions.LogNormal, () => ({
+const dist = model.create("responseTime", distributions.LogNormal, {
   mu: -3, // log-space mean
   sigma: 0.5, // log-space standard deviation
-}));
+});
 ```
 
 ### Pareto
@@ -54,10 +54,10 @@ const dist = model.create("responseTime", distributions.LogNormal, () => ({
 Heavy-tailed distribution for modeling outliers.
 
 ```typescript
-const dist = model.create("payloadSize", distributions.Pareto, () => ({
+const dist = model.create("payloadSize", distributions.Pareto, {
   scale: 1.0, // minimum value
   shape: 2.0, // tail heaviness (lower = heavier tail)
-}));
+});
 ```
 
 ## Using distributions with LatencyBlueprint
@@ -65,14 +65,14 @@ const dist = model.create("payloadSize", distributions.Pareto, () => ({
 The most common use is pairing a distribution with `blueprints.LatencyBlueprint`:
 
 ```typescript
-const dist = model.create("dbDist", distributions.Exponential, () => ({
+const dist = model.create("dbDist", distributions.Exponential, {
   mean: 0.005,
-}));
+});
 const latencyMetrics = model.create("dbLatency", metrics.Summary);
-const dbLink = model.create("dbLink", blueprints.LatencyBlueprint, () => ({
+const dbLink = model.create("dbLink", blueprints.LatencyBlueprint, {
   latency: dist,
   metrics: latencyMetrics,
-}));
+});
 
 // In a Blueprint:
 await this.params.dbLink.delay(0); // samples from dist, records to metrics
@@ -84,10 +84,11 @@ Extend the `Distribution` base class:
 
 ```typescript
 class Bimodal extends Distribution {
-  params = {
+  static params = {
     fast: component.ref(distributions.Normal),
     slow: component.ref(distributions.Normal),
   };
+  declare params: typeof Bimodal.params;
 
   draw(): number {
     if (this.random() < 0.9) {

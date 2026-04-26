@@ -14,10 +14,11 @@ import { createEngine } from "./create-engine";
 // ---------------------------------------------------------------------------
 
 class Pool extends Blueprint {
-  params = {
+  static params = {
     capacity: component.capacity(),
     utilization: component.ref(metrics.Gauge),
   };
+  declare params: typeof Pool.params;
   count = 0;
 
   acquire(): boolean {
@@ -36,11 +37,12 @@ class Pool extends Blueprint {
 }
 
 class DB extends Blueprint {
-  params = {
+  static params = {
     pool: component.ref(Pool),
     qps: component.ref(metrics.Counter),
     link: component.ref(blueprints.LatencyBlueprint),
   };
+  declare params: typeof DB.params;
 
   engineOnStart() {
     void this.generateQueries();
@@ -68,47 +70,43 @@ function buildRealisticModel(duration: number) {
   const utilization = model.create<metrics.Gauge<"ratio">>(
     "utilization",
     metrics.Gauge,
-    () => ({
+    {
       unit: "ratio",
-    }),
+    },
   );
-  const qps = model.create<metrics.Counter<"count">>(
-    "qps",
-    metrics.Counter,
-    () => ({
-      unit: "count",
-    }),
-  );
-  model.create<metrics.Summary<"duration">>("latency", metrics.Summary, () => ({
+  const qps = model.create<metrics.Counter<"count">>("qps", metrics.Counter, {
+    unit: "count",
+  });
+  model.create<metrics.Summary<"duration">>("latency", metrics.Summary, {
     unit: "duration",
     buckets: [0.5, 0.9, 0.99],
     capacity: 1000,
-  }));
-  const dist = model.create("dist", distributions.Exponential, () => ({
+  });
+  const dist = model.create("dist", distributions.Exponential, {
     mean: 0.005,
-  }));
+  });
   const latency = model.create<metrics.Summary<"duration">>(
     "link-latency",
     metrics.Summary,
-    () => ({
+    {
       unit: "duration",
       buckets: [0.5, 0.9, 0.99],
       capacity: 1000,
-    }),
+    },
   );
-  const link = model.create("link", blueprints.LatencyBlueprint, () => ({
+  const link = model.create("link", blueprints.LatencyBlueprint, {
     latency: dist,
     metrics: latency,
-  }));
-  const pool = model.create("pool", Pool, () => ({
+  });
+  const pool = model.create("pool", Pool, {
     capacity: 20,
     utilization,
-  }));
-  model.create("db", DB, () => ({
+  });
+  model.create("db", DB, {
     pool,
     qps,
     link,
-  }));
+  });
   return { model, duration };
 }
 
@@ -117,8 +115,6 @@ function buildRealisticModel(duration: number) {
 // ---------------------------------------------------------------------------
 
 class Ticker extends Blueprint {
-  params = {};
-
   engineOnStart() {
     void this.tick();
   }
@@ -132,7 +128,7 @@ class Ticker extends Blueprint {
 
 function buildMinimalModel(duration: number) {
   const model = createModel();
-  model.create("ticker", Ticker, () => ({}));
+  model.create("ticker", Ticker, {});
   return { model, duration };
 }
 

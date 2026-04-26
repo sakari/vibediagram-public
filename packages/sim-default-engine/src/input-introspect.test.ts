@@ -42,13 +42,13 @@ describe("InputNode introspection", () => {
   describe("[input-resolve]", () => {
     it("InputNode resolves with correct default value after introspection", () => {
       const model = createModel();
-      const rate = model.create("rate", InputNode, () => ({
+      const rate = model.create("rate", InputNode, {
         kind: "number",
         min: 0,
         max: 100,
         step: 1,
         defaultValue: 10,
-      }));
+      });
       const { inputRegistry } = introspect(model, makeEngineFactory());
 
       const input = inputRegistry.get("rate");
@@ -59,13 +59,13 @@ describe("InputNode introspection", () => {
 
     it("InputNode params are resolved after introspection", () => {
       const model = createModel();
-      const rate = model.create("rate", InputNode, () => ({
+      const rate = model.create("rate", InputNode, {
         kind: "number",
         min: 0,
         max: 100,
         step: 0.5,
         defaultValue: 5,
-      }));
+      });
       introspect(model, makeEngineFactory());
 
       expect(rate.params.kind).toBe("number");
@@ -79,20 +79,21 @@ describe("InputNode introspection", () => {
   describe("[input-ref]", () => {
     it("Blueprint can reference InputNode via component.ref", () => {
       class Limiter extends Blueprint {
-        params = {
+        static params = {
           rate: component.ref(InputNode),
         };
+        declare params: typeof Limiter.params;
       }
 
       const model = createModel();
-      const rate = model.create("rate", InputNode, () => ({
+      const rate = model.create("rate", InputNode, {
         kind: "number",
         min: 0,
         max: 100,
         step: 1,
         defaultValue: 10,
-      }));
-      const limiter = model.create("limiter", Limiter, () => ({ rate }));
+      });
+      const limiter = model.create("limiter", Limiter, { rate });
       introspect(model, makeEngineFactory());
 
       expect(limiter.params.rate).toBe(rate);
@@ -103,20 +104,21 @@ describe("InputNode introspection", () => {
   describe("[input-handle-mutation]", () => {
     it("mutating InputNode.value is visible from blueprint params", () => {
       class Service extends Blueprint {
-        params = {
+        static params = {
           throughput: component.ref(InputNode),
         };
+        declare params: typeof Service.params;
       }
 
       const model = createModel();
-      const throughput = model.create("throughput", InputNode, () => ({
+      const throughput = model.create("throughput", InputNode, {
         kind: "number",
         min: 1,
         max: 1000,
         step: 1,
         defaultValue: 50,
-      }));
-      const svc = model.create("svc", Service, () => ({ throughput }));
+      });
+      const svc = model.create("svc", Service, { throughput });
       const { inputRegistry } = introspect(model, makeEngineFactory());
 
       const input = inputRegistry.get("throughput")!;
@@ -131,26 +133,28 @@ describe("InputNode introspection", () => {
   describe("[input-coexistence]", () => {
     it("InputNode coexists with regular sentinel params on blueprints", () => {
       class Pool extends Blueprint {
-        params = { capacity: component.capacity() };
+        static params = { capacity: component.capacity() };
+        declare params: typeof Pool.params;
       }
 
       class Worker extends Blueprint {
-        params = {
+        static params = {
           pool: component.ref(Pool),
           speed: component.ref(InputNode),
         };
+        declare params: typeof Worker.params;
       }
 
       const model = createModel();
-      const pool = model.create("pool", Pool, () => ({ capacity: 5 }));
-      const speed = model.create("speed", InputNode, () => ({
+      const pool = model.create("pool", Pool, { capacity: 5 });
+      const speed = model.create("speed", InputNode, {
         kind: "number",
         min: 0,
         max: 100,
         step: 1,
         defaultValue: 10,
-      }));
-      model.create("worker", Worker, () => ({ pool, speed }));
+      });
+      model.create("worker", Worker, { pool, speed });
 
       const { registrations, inputRegistry, startOrder } = introspect(
         model,
@@ -175,20 +179,20 @@ describe("InputNode introspection", () => {
 
     it("multiple InputNodes all resolve", () => {
       const model = createModel();
-      model.create("rate", InputNode, () => ({
+      model.create("rate", InputNode, {
         kind: "number",
         min: 0,
         max: 100,
         step: 1,
         defaultValue: 10,
-      }));
-      model.create("enabled", InputNode, () => ({
+      });
+      model.create("enabled", InputNode, {
         kind: "boolean",
         min: 0,
         max: 1,
         step: 1,
         defaultValue: 1,
-      }));
+      });
       const { inputRegistry } = introspect(model, makeEngineFactory());
 
       expect(inputRegistry.get("rate")!.value).toBe(10);
@@ -200,20 +204,20 @@ describe("InputNode introspection", () => {
   describe("[input-registry]", () => {
     it("inputRegistry is returned from introspect() with correct keys", () => {
       const model = createModel();
-      model.create("x", InputNode, () => ({
+      model.create("x", InputNode, {
         kind: "number",
         min: 0,
         max: 10,
         step: 1,
         defaultValue: 1,
-      }));
-      model.create("y", InputNode, () => ({
+      });
+      model.create("y", InputNode, {
         kind: "boolean",
         min: 0,
         max: 1,
         step: 1,
         defaultValue: 0,
-      }));
+      });
       const { inputRegistry } = introspect(model, makeEngineFactory());
 
       expect(inputRegistry.size).toBe(2);
@@ -223,13 +227,13 @@ describe("InputNode introspection", () => {
 
     it("inputRegistry is available on EngineController from createEngine()", () => {
       const model = createModel();
-      model.create("level", InputNode, () => ({
+      model.create("level", InputNode, {
         kind: "number",
         min: 0,
         max: 10,
         step: 1,
         defaultValue: 5,
-      }));
+      });
       const controller = createEngine(model, { seed: "test-input" });
 
       expect(controller.inputRegistry).toBeInstanceOf(Map);
@@ -244,13 +248,13 @@ describe("InputNode introspection", () => {
   describe("[input-topology]", () => {
     it("InputNode appears in model registrations like any other node", () => {
       const model = createModel();
-      model.create("capacity", InputNode, () => ({
+      model.create("capacity", InputNode, {
         kind: "number",
         min: 1,
         max: 100,
         step: 1,
         defaultValue: 20,
-      }));
+      });
       const names = model.registrations.map((r) => r.name);
       expect(names).toContain("capacity");
     });

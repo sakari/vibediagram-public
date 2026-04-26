@@ -64,6 +64,26 @@ describe("sentinel", () => {
       expect(isSentinel(component.ref(ResourcePool))).toBe(true);
     });
 
+    it("ref(() => Class) defers target resolution until first read", () => {
+      // The lazy arrow form is the escape hatch for circular static-params
+      // schemas: it lets CycleA reference CycleB before CycleB is declared.
+      // We instrument the arrow with a side-effect counter to prove the
+      // implementation does not call it eagerly at component.ref() time.
+      let calls = 0;
+      const lazy = () => {
+        calls++;
+        return ResourcePool;
+      };
+      const m = sentinel(component.ref(lazy));
+      expect(m.kind).toBe("ref");
+      if (m.kind !== "ref") throw new Error("expected ref sentinel");
+      expect(calls).toBe(0); // arrow not yet invoked
+      expect(m.target).toBe(ResourcePool);
+      expect(calls).toBe(1); // first access resolves
+      expect(m.target).toBe(ResourcePool);
+      expect(calls).toBe(1); // second access hits the cache
+    });
+
     it("isSentinel returns false for null, undefined, numbers, strings, plain objects", () => {
       expect(isSentinel(null)).toBe(false);
       expect(isSentinel(undefined)).toBe(false);

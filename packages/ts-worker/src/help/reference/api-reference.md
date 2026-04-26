@@ -34,7 +34,10 @@ import {
 ```typescript
 class MyNode extends Node {
   name: string; // set by framework
+  static params: { … };                   // schema (sentinels); readable without instantiation
+  declare params: typeof MyNode.params;   // instance mirror; resolved values after wiring
   static defaultStyleRules(): StyleRuleDescriptor[];
+  wire(patch): this;                      // late-binding for circular refs
 }
 ```
 
@@ -42,6 +45,10 @@ class MyNode extends Node {
 
 ```typescript
 class MyBlueprint extends Blueprint {
+  static params = {
+    /* sentinels */
+  };
+  declare params: typeof MyBlueprint.params;
   engine: Engine; // assigned at runtime
   engineOnStart(): void {} // simulation start hook
   engineCheckInvariant(): void {} // called after each tick
@@ -50,13 +57,13 @@ class MyBlueprint extends Blueprint {
 
 ## Engine (via this.engine)
 
-| Method                       | Returns         | Description                |
-| ---------------------------- | --------------- | -------------------------- |
-| `timeout(seconds)`           | `Promise<void>` | Delay in simulated time    |
-| `random()`                   | `number`        | Seeded pseudorandom [0, 1) |
-| `halt(reason)`               | `void`          | Stop simulation            |
-| `spawn(name, Class, thunk?)` | `T`             | Create node at runtime     |
-| `now()`                      | `number`        | Current sim time (seconds) |
+| Method                        | Returns         | Description                |
+| ----------------------------- | --------------- | -------------------------- |
+| `timeout(seconds)`            | `Promise<void>` | Delay in simulated time    |
+| `random()`                    | `number`        | Seeded pseudorandom [0, 1) |
+| `halt(reason)`                | `void`          | Stop simulation            |
+| `spawn(name, Class, params?)` | `T`             | Create node at runtime     |
+| `now()`                       | `number`        | Current sim time (seconds) |
 
 ## Metrics
 
@@ -71,14 +78,18 @@ Units: `"count" | "byte" | "duration" | "ratio" | "timestamp"`
 ## InputNode
 
 ```typescript
-model.create("name", InputNode, () => ({
-  kind: "number" | "boolean",
-  defaultValue: 50,
-  min: 0,
-  max: 100,
-  step: 1,
-  label: "Display Name",
-}));
+model.create(
+  "name",
+  InputNode,
+  {
+    kind: "number" /* or "boolean" */,
+    defaultValue: 50,
+    min: 0,
+    max: 100,
+    step: 1,
+  },
+  { label: "Display Name" },
+);
 // Read: this.params.input.value
 ```
 
@@ -106,11 +117,20 @@ model.create("name", InputNode, () => ({
 
 ```typescript
 const model = createModel();
-const node = model.create("id", Class, () => ({
-  ...paramValues,
-  label: "Display Label",
-  description: "Tooltip text",
-}));
+
+// model.create(name, Class, params?, opts?)
+//   - params: a partial of Class's resolved param shape (defaults fill the rest)
+//   - opts:   { label?, description? } display metadata
+const node = model.create(
+  "id",
+  Class,
+  { ...paramValues },
+  { label: "Display Label", description: "Tooltip text" },
+);
+
+// Late-bind a back-reference (circular wiring):
+node.wire({ otherKey: otherNode });
+
 model.addStyleRules(rules);
 export { model };
 ```

@@ -10,13 +10,15 @@ import {
 } from "@diagram/sim-model";
 
 class Cache extends Blueprint {
-  params = {
+  static params = {
     hitRateGauge: component.ref(metrics.Gauge),
     requests: component.ref(metrics.Counter),
     cacheLink: component.ref(blueprints.LatencyBlueprint),
     dbLink: component.ref(blueprints.LatencyBlueprint),
     hitRatio: component.ref(InputNode),
   };
+
+  declare params: typeof Cache.params;
 
   private hits = 0;
   private total = 0;
@@ -49,9 +51,11 @@ class Cache extends Blueprint {
 }
 
 class AppServer extends Blueprint {
-  params = {
+  static params = {
     cache: component.ref(Cache),
   };
+
+  declare params: typeof AppServer.params;
 
   engineOnStart() {
     void this.generateRequests();
@@ -68,64 +72,63 @@ class AppServer extends Blueprint {
 export const model = createModel();
 
 // Configurable hit ratio (0.0 to 1.0)
-const hitRatio = model.create("hitRatio", InputNode, () => ({
+const hitRatio = model.create("hitRatio", InputNode, {
   kind: "number",
   defaultValue: 0.7,
   min: 0,
   max: 1,
   step: 0.05,
-}));
+});
 
 // Metrics
 const hitRateGauge = model.create<metrics.Gauge<"ratio">>(
   "hitRate",
   metrics.Gauge,
-  () => ({
+  {
     unit: "ratio",
-  }),
+  },
 );
 const requests = model.create("requests", metrics.Counter);
 const cacheLatency = model.create("cacheLatency", metrics.Summary);
 const dbLatency = model.create("dbLatency", metrics.Summary);
 
 // Latency distributions
-const cacheDist = model.create("cacheDist", distributions.Exponential, () => ({
+const cacheDist = model.create("cacheDist", distributions.Exponential, {
   mean: 0.001,
-}));
-const dbDist = model.create("dbDist", distributions.Exponential, () => ({
+});
+const dbDist = model.create("dbDist", distributions.Exponential, {
   mean: 0.01,
-}));
+});
 
 // Latency links
 const cacheLink = model.create(
   "cacheLink",
   blueprints.LatencyBlueprint,
-  () => ({
-    latency: cacheDist,
-    metrics: cacheLatency,
-    description: "Simulates cache lookup latency",
-  }),
+  { latency: cacheDist, metrics: cacheLatency },
+  { description: "Simulates cache lookup latency" },
 );
-const dbLink = model.create("dbLink", blueprints.LatencyBlueprint, () => ({
+const dbLink = model.create("dbLink", blueprints.LatencyBlueprint, {
   latency: dbDist,
   metrics: dbLatency,
-}));
+});
 
 // Cache component
-const cache = model.create("cache", Cache, () => ({
-  hitRateGauge,
-  requests,
-  cacheLink,
-  dbLink,
-  hitRatio,
-  description: "Caches responses; hits are fast, misses go to the database",
-}));
+const cache = model.create(
+  "cache",
+  Cache,
+  { hitRateGauge, requests, cacheLink, dbLink, hitRatio },
+  {
+    description: "Caches responses; hits are fast, misses go to the database",
+  },
+);
 
 // App server drives traffic
-model.create("appServer", AppServer, () => ({
-  cache,
-  description: "Generates a steady stream of requests to the cache",
-}));
+model.create(
+  "appServer",
+  AppServer,
+  { cache },
+  { description: "Generates a steady stream of requests to the cache" },
+);
 
 // ---------------------------------------------------------------------------
 // Style rules

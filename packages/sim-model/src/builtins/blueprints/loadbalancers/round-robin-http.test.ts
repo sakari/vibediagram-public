@@ -42,9 +42,9 @@ function buildLB(backendCount: number) {
     backends.push(b);
   }
 
-  const lb = model.create("lb", RoundRobinHttpLoadBalancer, () => ({
+  const lb = model.create("lb", RoundRobinHttpLoadBalancer, {
     backends,
-  }));
+  });
 
   // Wire a no-op engine — round-robin request() does not use engine methods.
   lb.engine = new Engine();
@@ -111,9 +111,9 @@ describe("RoundRobinHttpLoadBalancer", () => {
     const backend = new RichBackend();
     backend.name = "rich";
 
-    const lb = model.create("lb", RoundRobinHttpLoadBalancer, () => ({
+    const lb = model.create("lb", RoundRobinHttpLoadBalancer, {
       backends: [backend],
-    }));
+    });
     lb.engine = new Engine();
     lb.params = { backends: [backend] };
 
@@ -130,9 +130,9 @@ describe("RoundRobinHttpLoadBalancer", () => {
 
   it("throws when backends array is empty", async () => {
     const model = createModel();
-    const lb = model.create("lb", RoundRobinHttpLoadBalancer, () => ({
+    const lb = model.create("lb", RoundRobinHttpLoadBalancer, {
       backends: [],
-    }));
+    });
     lb.engine = new Engine();
     lb.params = { backends: [] };
 

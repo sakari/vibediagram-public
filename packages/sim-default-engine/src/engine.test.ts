@@ -9,7 +9,6 @@ import {
 import { createEngine } from "./create-engine";
 
 class DelayBlueprint extends Blueprint {
-  params = {};
   log: number[] = [];
   engineOnStart() {
     void this.scheduleDelay();
@@ -25,7 +24,7 @@ class DelayBlueprint extends Blueprint {
 describe("[engine-timeout]", () => {
   it("engine.timeout(0.5) resolves after simulated 0.5 seconds; log shows [0.5, 0.8]", async () => {
     const model = createModel();
-    const delay = model.create("delay", DelayBlueprint, () => ({}));
+    const delay = model.create("delay", DelayBlueprint, {});
     const controller = createEngine(model, { seed: "test" });
     await controller.run();
     expect(delay.log).toEqual([0.5, 0.8]);
@@ -36,7 +35,8 @@ describe("[engine-timeout]", () => {
 describe("[engine-deterministic]", () => {
   it("same model and seed yields identical currentTime and metric snapshots", async () => {
     class MetricBlueprint extends Blueprint {
-      params = { counter: component.ref(metrics.Counter) };
+      static params = { counter: component.ref(metrics.Counter) };
+      declare params: typeof MetricBlueprint.params;
       engineOnStart() {
         this.params.counter.increment({}, 1);
         void this.schedule();
@@ -52,11 +52,11 @@ describe("[engine-deterministic]", () => {
       const counter = model.create<metrics.Counter<"count", "name">>(
         "counter",
         metrics.Counter,
-        () => ({
+        {
           unit: "count",
-        }),
+        },
       );
-      model.create("bp", MetricBlueprint, () => ({ counter }));
+      model.create("bp", MetricBlueprint, { counter });
       const controller = createEngine(model, { seed: "deterministic" });
       await controller.run();
       return { time: controller.currentTime, snap: controller.snapshot() };
@@ -73,7 +73,6 @@ describe("[engine-deterministic]", () => {
 describe("[engine-promise-race]", () => {
   it("Promise.race between timeout(1) and timeout(0.5) resolves with 0.5s branch", async () => {
     class RaceBlueprint extends Blueprint {
-      params = {};
       winner: "short" | "long" | null = null;
       engineOnStart() {
         void this.runRace();
@@ -88,7 +87,7 @@ describe("[engine-promise-race]", () => {
     }
 
     const model = createModel();
-    const race = model.create("race", RaceBlueprint, () => ({}));
+    const race = model.create("race", RaceBlueprint, {});
     const controller = createEngine(model, { seed: "race" });
     await controller.run();
     expect(race.winner).toBe("short");
@@ -99,14 +98,14 @@ describe("[engine-promise-race]", () => {
 describe("[engine-direct-calls]", () => {
   it("Blueprint A calls Blueprint B async method directly; no sim time passes", async () => {
     class ServiceB extends Blueprint {
-      params = {};
       doWork(): Promise<string> {
         return Promise.resolve("done");
       }
     }
 
     class ServiceA extends Blueprint {
-      params = { b: component.ref(ServiceB) };
+      static params = { b: component.ref(ServiceB) };
+      declare params: typeof ServiceA.params;
       result = "";
       engineOnStart() {
         void this.start();
@@ -117,8 +116,8 @@ describe("[engine-direct-calls]", () => {
     }
 
     const model = createModel();
-    const serviceB = model.create("b", ServiceB, () => ({}));
-    const serviceA = model.create("a", ServiceA, () => ({ b: serviceB }));
+    const serviceB = model.create("b", ServiceB, {});
+    const serviceA = model.create("a", ServiceA, { b: serviceB });
     const controller = createEngine(model, { seed: "direct" });
     await controller.run();
     expect(serviceA.result).toBe("done");
@@ -129,7 +128,6 @@ describe("[engine-direct-calls]", () => {
 describe("[engine-duration]", () => {
   it("with duration 10, events past t=10 are not processed", async () => {
     class LateBlueprint extends Blueprint {
-      params = {};
       resolved = false;
       engineOnStart() {
         void this.scheduleLate();
@@ -141,7 +139,7 @@ describe("[engine-duration]", () => {
     }
 
     const model = createModel();
-    const late = model.create("late", LateBlueprint, () => ({}));
+    const late = model.create("late", LateBlueprint, {});
     const controller = createEngine(model, { seed: "duration", duration: 10 });
     await controller.run();
     expect(late.resolved).toBe(false);
@@ -152,7 +150,6 @@ describe("[engine-duration]", () => {
 describe("[engine-step]", () => {
   it("step() processes exactly one event; currentTime advances per step", async () => {
     class StepBlueprint extends Blueprint {
-      params = {};
       log: number[] = [];
       engineOnStart() {
         void this.schedule();
@@ -166,7 +163,7 @@ describe("[engine-step]", () => {
     }
 
     const model = createModel();
-    model.create("step", StepBlueprint, () => ({}));
+    model.create("step", StepBlueprint, {});
     const controller = createEngine(model, { seed: "step" });
 
     const r1 = await controller.step();
@@ -193,7 +190,6 @@ describe("[engine-step]", () => {
 describe("[engine-pause-resume]", () => {
   it("pause() stops run loop; run() again resumes and processes remaining events", async () => {
     class MultiDelayBlueprint extends Blueprint {
-      params = {};
       log: number[] = [];
       engineOnStart() {
         void this.schedule();
@@ -209,7 +205,7 @@ describe("[engine-pause-resume]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("multi", MultiDelayBlueprint, () => ({}));
+    const bp = model.create("multi", MultiDelayBlueprint, {});
     const controller = createEngine(model, { seed: "pause" });
 
     const runPromise = controller.run();
@@ -223,7 +219,6 @@ describe("[engine-pause-resume]", () => {
 
   it("step-based loop resumes from where it paused, not from beginning", async () => {
     class AccumulatorBlueprint extends Blueprint {
-      params = {};
       count = 0;
       engineOnStart() {
         void this.work();
@@ -237,7 +232,7 @@ describe("[engine-pause-resume]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("bp", AccumulatorBlueprint, () => ({}));
+    const bp = model.create("bp", AccumulatorBlueprint, {});
     const controller = createEngine(model, { seed: "step-pause" });
 
     await controller.step();
@@ -255,7 +250,6 @@ describe("[engine-pause-resume]", () => {
 describe("[engine-initial-flush]", () => {
   it("fire-and-forget async chains from engineOnStart enqueue timeouts before the run loop", async () => {
     class ChainA extends Blueprint {
-      params = {};
       log: string[] = [];
       engineOnStart() {
         void this.go();
@@ -267,7 +261,6 @@ describe("[engine-initial-flush]", () => {
     }
 
     class ChainB extends Blueprint {
-      params = {};
       log: string[] = [];
       engineOnStart() {
         void this.go();
@@ -279,8 +272,8 @@ describe("[engine-initial-flush]", () => {
     }
 
     const model = createModel();
-    const a = model.create("a", ChainA, () => ({}));
-    const b = model.create("b", ChainB, () => ({}));
+    const a = model.create("a", ChainA, {});
+    const b = model.create("b", ChainB, {});
     const controller = createEngine(model, { seed: "initial-flush" });
     await controller.run();
 
@@ -293,7 +286,6 @@ describe("[engine-initial-flush]", () => {
 describe("[engine-random]", () => {
   it("engine.random() returns deterministic values in [0, 1)", async () => {
     class RandomBlueprint extends Blueprint {
-      params = {};
       values: number[] = [];
       engineOnStart() {
         for (let i = 0; i < 10; i++) {
@@ -303,7 +295,7 @@ describe("[engine-random]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("rng", RandomBlueprint, () => ({}));
+    const bp = model.create("rng", RandomBlueprint, {});
     const controller = createEngine(model, { seed: "random-test" });
     await controller.run();
 
@@ -317,7 +309,6 @@ describe("[engine-random]", () => {
 
   it("same seed produces identical random sequence", async () => {
     class RandomBlueprint extends Blueprint {
-      params = {};
       values: number[] = [];
       engineOnStart() {
         for (let i = 0; i < 5; i++) {
@@ -328,7 +319,7 @@ describe("[engine-random]", () => {
 
     const collect = async () => {
       const model = createModel();
-      const bp = model.create("rng", RandomBlueprint, () => ({}));
+      const bp = model.create("rng", RandomBlueprint, {});
       const controller = createEngine(model, { seed: "deterministic-rng" });
       await controller.run();
       return bp.values;
@@ -343,7 +334,8 @@ describe("[engine-random]", () => {
 describe("[engine-snapshot]", () => {
   it("snapshot() returns Counter data after simulation", async () => {
     class CounterBlueprint extends Blueprint {
-      params = { counter: component.ref(metrics.Counter) };
+      static params = { counter: component.ref(metrics.Counter) };
+      declare params: typeof CounterBlueprint.params;
       engineOnStart() {
         this.params.counter.increment({ name: "foo" }, 3);
         this.params.counter.increment({ name: "bar" }, 7);
@@ -359,11 +351,11 @@ describe("[engine-snapshot]", () => {
     const counter = model.create<metrics.Counter<"count", "name">>(
       "counter",
       metrics.Counter,
-      () => ({
+      {
         unit: "count",
-      }),
+      },
     );
-    model.create("bp", CounterBlueprint, () => ({ counter }));
+    model.create("bp", CounterBlueprint, { counter });
     const controller = createEngine(model, { seed: "snapshot" });
     await controller.run();
 
@@ -384,7 +376,6 @@ describe("[engine-snapshot]", () => {
 describe("[engine-halt]", () => {
   it("halt() inside Blueprint stops the run loop, run() resolves", async () => {
     class HaltBlueprint extends Blueprint {
-      params = {};
       postHaltLog: number[] = [];
       engineOnStart() {
         void this.schedule();
@@ -398,7 +389,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("bp", HaltBlueprint, () => ({}));
+    const bp = model.create("bp", HaltBlueprint, {});
     const controller = createEngine(model, { seed: "halt" });
     await controller.run();
     expect(bp.postHaltLog).toEqual([]);
@@ -406,7 +397,6 @@ describe("[engine-halt]", () => {
 
   it("haltResult contains reason and time after halt", async () => {
     class HaltBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -417,7 +407,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    model.create("bp", HaltBlueprint, () => ({}));
+    model.create("bp", HaltBlueprint, {});
     const controller = createEngine(model, { seed: "halt-result" });
     await controller.run();
     expect(controller.haltResult).toEqual({
@@ -428,7 +418,6 @@ describe("[engine-halt]", () => {
 
   it("haltResult is undefined after normal run", async () => {
     class NormalBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -438,7 +427,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    model.create("bp", NormalBlueprint, () => ({}));
+    model.create("bp", NormalBlueprint, {});
     const controller = createEngine(model, { seed: "normal" });
     await controller.run();
     expect(controller.haltResult).toBeUndefined();
@@ -446,7 +435,6 @@ describe("[engine-halt]", () => {
 
   it("step() returns false after halt", async () => {
     class HaltBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -458,7 +446,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    model.create("bp", HaltBlueprint, () => ({}));
+    model.create("bp", HaltBlueprint, {});
     const controller = createEngine(model, { seed: "step-halt" });
 
     const r1 = await controller.step();
@@ -473,7 +461,6 @@ describe("[engine-halt]", () => {
 
   it("second halt() does not overwrite first", async () => {
     class DoubleHaltBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -485,7 +472,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    model.create("bp", DoubleHaltBlueprint, () => ({}));
+    model.create("bp", DoubleHaltBlueprint, {});
     const controller = createEngine(model, { seed: "double-halt" });
     await controller.run();
     expect(controller.haltResult).toEqual({ reason: "first", time: 1 });
@@ -493,7 +480,6 @@ describe("[engine-halt]", () => {
 
   it("halt() inside try/catch still stops simulation", async () => {
     class TryCatchBlueprint extends Blueprint {
-      params = {};
       postHaltLog: string[] = [];
       engineOnStart() {
         void this.schedule();
@@ -511,7 +497,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("bp", TryCatchBlueprint, () => ({}));
+    const bp = model.create("bp", TryCatchBlueprint, {});
     const controller = createEngine(model, { seed: "try-catch" });
     await controller.run();
     expect(controller.haltResult).toEqual(
@@ -522,7 +508,6 @@ describe("[engine-halt]", () => {
 
   it("halt() in engineOnStart prevents any events from processing", async () => {
     class EarlyHaltBlueprint extends Blueprint {
-      params = {};
       eventRan = false;
       engineOnStart() {
         this.engine.halt("early");
@@ -535,7 +520,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("bp", EarlyHaltBlueprint, () => ({}));
+    const bp = model.create("bp", EarlyHaltBlueprint, {});
     const controller = createEngine(model, { seed: "early-halt" });
     await controller.run();
     expect(bp.eventRan).toBe(false);
@@ -548,7 +533,6 @@ describe("[engine-halt]", () => {
     }
 
     class HelperBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -560,7 +544,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    model.create("bp", HelperBlueprint, () => ({}));
+    model.create("bp", HelperBlueprint, {});
     const controller = createEngine(model, { seed: "helper-halt" });
     await controller.run();
     expect(controller.haltResult).toEqual(
@@ -570,7 +554,6 @@ describe("[engine-halt]", () => {
 
   it("run() after halt resolves immediately (halt is sticky)", async () => {
     class HaltBlueprint extends Blueprint {
-      params = {};
       runCount = 0;
       engineOnStart() {
         void this.schedule();
@@ -585,7 +568,7 @@ describe("[engine-halt]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("bp", HaltBlueprint, () => ({}));
+    const bp = model.create("bp", HaltBlueprint, {});
     const controller = createEngine(model, { seed: "sticky-halt" });
     await controller.run();
     expect(bp.runCount).toBe(1);
@@ -601,7 +584,8 @@ describe("[engine-halt]", () => {
 describe("[engine-snapshot-unit]", () => {
   it("snapshot() includes unit field from counter thunk", async () => {
     class ByteCounterBlueprint extends Blueprint {
-      params = { counter: component.ref(metrics.Counter) };
+      static params = { counter: component.ref(metrics.Counter) };
+      declare params: typeof ByteCounterBlueprint.params;
       engineOnStart() {
         this.params.counter.increment({ name: "tx" }, 1536);
         this.params.counter.increment({ name: "rx" }, 4096);
@@ -612,11 +596,11 @@ describe("[engine-snapshot-unit]", () => {
     const counter = model.create<metrics.Counter<"byte", "name">>(
       "counter",
       metrics.Counter,
-      () => ({
+      {
         unit: "byte",
-      }),
+      },
     );
-    model.create("bp", ByteCounterBlueprint, () => ({ counter }));
+    model.create("bp", ByteCounterBlueprint, { counter });
     const controller = createEngine(model, { seed: "snapshot-unit" });
     await controller.run();
 
@@ -643,7 +627,6 @@ describe("[engine-snapshot-unit]", () => {
 describe("[engine-halt-exception]", () => {
   it("uncaught exception becomes halt, run() resolves", async () => {
     class ThrowingBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -654,7 +637,7 @@ describe("[engine-halt-exception]", () => {
     }
 
     const model = createModel();
-    model.create("bp", ThrowingBlueprint, () => ({}));
+    model.create("bp", ThrowingBlueprint, {});
     const controller = createEngine(model, { seed: "exception-halt" });
     await controller.run();
     expect(controller.haltResult).toBeDefined();
@@ -664,7 +647,6 @@ describe("[engine-halt-exception]", () => {
 
   it("non-Error rejection is captured as string reason", async () => {
     class StringThrowBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -676,7 +658,7 @@ describe("[engine-halt-exception]", () => {
     }
 
     const model = createModel();
-    model.create("bp", StringThrowBlueprint, () => ({}));
+    model.create("bp", StringThrowBlueprint, {});
     const controller = createEngine(model, { seed: "string-throw" });
     await controller.run();
     expect(controller.haltResult).toBeDefined();
@@ -685,7 +667,6 @@ describe("[engine-halt-exception]", () => {
 
   it("explicit halt() takes precedence over subsequent exception", async () => {
     class HaltThenThrowBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -697,7 +678,7 @@ describe("[engine-halt-exception]", () => {
     }
 
     const model = createModel();
-    model.create("bp", HaltThenThrowBlueprint, () => ({}));
+    model.create("bp", HaltThenThrowBlueprint, {});
     const controller = createEngine(model, { seed: "halt-then-throw" });
     await controller.run();
     expect(controller.haltResult).toBeDefined();
@@ -706,7 +687,6 @@ describe("[engine-halt-exception]", () => {
 
   it("uncaught exception during step() is captured as halt", async () => {
     class StepThrowBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -717,7 +697,7 @@ describe("[engine-halt-exception]", () => {
     }
 
     const model = createModel();
-    model.create("bp", StepThrowBlueprint, () => ({}));
+    model.create("bp", StepThrowBlueprint, {});
     const controller = createEngine(model, { seed: "step-exception" });
     const r1 = await controller.step();
     expect(r1).toBe(true);
@@ -733,7 +713,6 @@ describe("[engine-invariant]", () => {
     let checkCount = 0;
 
     class InvariantBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -751,7 +730,7 @@ describe("[engine-invariant]", () => {
     }
 
     const model = createModel();
-    model.create("bp", InvariantBlueprint, () => ({}));
+    model.create("bp", InvariantBlueprint, {});
     const controller = createEngine(model, { seed: "invariant" });
     await controller.run();
 
@@ -766,7 +745,6 @@ describe("[engine-invariant]", () => {
     const callOrder: string[] = [];
 
     class FirstBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -780,15 +758,14 @@ describe("[engine-invariant]", () => {
     }
 
     class SecondBlueprint extends Blueprint {
-      params = {};
       engineCheckInvariant(): void {
         callOrder.push("second");
       }
     }
 
     const model = createModel();
-    model.create("a", FirstBlueprint, () => ({}));
-    model.create("b", SecondBlueprint, () => ({}));
+    model.create("a", FirstBlueprint, {});
+    model.create("b", SecondBlueprint, {});
     const controller = createEngine(model, { seed: "multi-invariant" });
     await controller.run();
 
@@ -803,7 +780,6 @@ describe("[engine-invariant]", () => {
     let checkCount = 0;
 
     class StepInvariantBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -817,7 +793,7 @@ describe("[engine-invariant]", () => {
     }
 
     const model = createModel();
-    model.create("bp", StepInvariantBlueprint, () => ({}));
+    model.create("bp", StepInvariantBlueprint, {});
     const controller = createEngine(model, { seed: "step-invariant" });
 
     await controller.step();
@@ -829,7 +805,6 @@ describe("[engine-invariant]", () => {
 
   it("models without engineCheckInvariant overrides work unchanged", async () => {
     class PlainBlueprint extends Blueprint {
-      params = {};
       log: number[] = [];
       engineOnStart() {
         void this.schedule();
@@ -843,7 +818,7 @@ describe("[engine-invariant]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("bp", PlainBlueprint, () => ({}));
+    const bp = model.create("bp", PlainBlueprint, {});
     const controller = createEngine(model, { seed: "no-invariant" });
     await controller.run();
 
@@ -853,7 +828,6 @@ describe("[engine-invariant]", () => {
 
   it("invariant halt records correct simulated time", async () => {
     class TimedInvariantBlueprint extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -869,7 +843,7 @@ describe("[engine-invariant]", () => {
     }
 
     const model = createModel();
-    model.create("bp", TimedInvariantBlueprint, () => ({}));
+    model.create("bp", TimedInvariantBlueprint, {});
     const controller = createEngine(model, { seed: "timed-invariant" });
     await controller.run();
 
@@ -881,7 +855,6 @@ describe("[engine-invariant]", () => {
     const callOrder: string[] = [];
 
     class ThrowingInvariant extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
@@ -895,15 +868,14 @@ describe("[engine-invariant]", () => {
     }
 
     class SecondInvariant extends Blueprint {
-      params = {};
       engineCheckInvariant(): void {
         callOrder.push("second");
       }
     }
 
     const model = createModel();
-    model.create("a", ThrowingInvariant, () => ({}));
-    model.create("b", SecondInvariant, () => ({}));
+    model.create("a", ThrowingInvariant, {});
+    model.create("b", SecondInvariant, {});
     const controller = createEngine(model, { seed: "throw-invariant" });
     await controller.run();
 
@@ -919,26 +891,24 @@ describe("[engine-invariant]", () => {
     let spawnedInvariantCount = 0;
 
     class SpawnedChild extends Blueprint {
-      params = {};
       engineCheckInvariant(): void {
         spawnedInvariantCount++;
       }
     }
 
     class Spawner extends Blueprint {
-      params = {};
       engineOnStart() {
         void this.schedule();
       }
       async schedule() {
         await this.engine.timeout(1);
-        this.engine.spawn("child", SpawnedChild, () => ({}));
+        this.engine.spawn("child", SpawnedChild, {});
         await this.engine.timeout(1);
       }
     }
 
     const model = createModel();
-    model.create("spawner", Spawner, () => ({}));
+    model.create("spawner", Spawner, {});
     const controller = createEngine(model, { seed: "spawn-invariant" });
     await controller.run();
 
@@ -949,7 +919,6 @@ describe("[engine-invariant]", () => {
 describe("[engine-now]", () => {
   it("engine.now() returns current simulated time matching controller.currentTime", async () => {
     class NowBlueprint extends Blueprint {
-      params = {};
       times: number[] = [];
       engineOnStart() {
         void this.recordTimes();
@@ -964,7 +933,7 @@ describe("[engine-now]", () => {
     }
 
     const model = createModel();
-    const bp = model.create("now-test", NowBlueprint, () => ({}));
+    const bp = model.create("now-test", NowBlueprint, {});
     const controller = createEngine(model, { seed: "now-test" });
     await controller.run();
 

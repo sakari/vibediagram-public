@@ -6,24 +6,23 @@ adjust at runtime while the simulation runs.
 ## Number input
 
 ```typescript
-const rate = model.create("rate", InputNode, () => ({
-  kind: "number",
-  defaultValue: 50,
-  min: 1,
-  max: 200,
-  step: 1,
-  label: "Request Rate",
-}));
+const rate = model.create(
+  "rate",
+  InputNode,
+  { kind: "number", defaultValue: 50, min: 1, max: 200, step: 1 },
+  { label: "Request Rate" },
+);
 ```
 
 ## Boolean input
 
 ```typescript
-const enabled = model.create("cacheEnabled", InputNode, () => ({
-  kind: "boolean",
-  defaultValue: 1, // 1 = true, 0 = false
-  label: "Cache Enabled",
-}));
+const enabled = model.create(
+  "cacheEnabled",
+  InputNode,
+  { kind: "boolean", defaultValue: 1 }, // 1 = true, 0 = false
+  { label: "Cache Enabled" },
+);
 ```
 
 ## Reading the value
@@ -32,9 +31,10 @@ Access the current value inside a Blueprint via `this.params`:
 
 ```typescript
 class Server extends Blueprint {
-  params = {
+  static params = {
     rate: component.ref(InputNode),
   };
+  declare params: typeof Server.params;
 
   engineOnStart() {
     void this.run();
@@ -57,9 +57,10 @@ and updates immediately when the user changes it during simulation.
 
 ```typescript
 class MyNode extends Blueprint {
-  params = {
+  static params = {
     capacity: component.ref(InputNode),
   };
+  declare params: typeof MyNode.params;
 }
 ```
 

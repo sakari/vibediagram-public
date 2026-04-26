@@ -31,66 +31,59 @@ function buildPoolModel(opts: {
 }) {
   const model = createModel();
 
-  const capacityInput = model.create("capacity", InputNode, () => ({
+  const capacityInput = model.create("capacity", InputNode, {
     kind: "number",
     defaultValue: opts.capacity,
     min: 1,
     max: 100,
     step: 1,
-  }));
+  });
 
-  const scalingInput = model.create("scalingExponent", InputNode, () => ({
+  const scalingInput = model.create("scalingExponent", InputNode, {
     kind: "number",
     defaultValue: opts.scalingExponent,
     min: 0,
     max: 10,
     step: 0.1,
-  }));
+  });
 
-  const latencyDist = model.create("latency", distributions.Uniform, () => ({
+  const latencyDist = model.create("latency", distributions.Uniform, {
     min: opts.latencyMin,
     max: opts.latencyMax,
-  }));
+  });
 
   const utilGauge = model.create<metrics.Gauge<"ratio">>(
     "utilization",
     metrics.Gauge,
-    () => ({
-      unit: "ratio",
-    }),
+    { unit: "ratio" },
   );
 
   const latencyMetrics = model.create<metrics.Summary<"duration">>(
     "latencyMetrics",
     metrics.Summary,
-    () => ({
-      unit: "duration",
-      buckets: [0.5, 0.9, 0.99],
-      capacity: 1000,
-    }),
+    { unit: "duration", buckets: [0.5, 0.9, 0.99], capacity: 1000 },
   );
 
   const concurrentGauge = model.create<metrics.Gauge<"count", "state">>(
     "concurrent",
     metrics.Gauge,
-    () => ({
-      unit: "count",
-    }),
+    { unit: "count" },
   );
 
-  const pool = model.create("pool", ResourcePool, () => ({
+  const pool = model.create("pool", ResourcePool, {
     capacity: capacityInput,
     scalingExponent: scalingInput,
     latency: latencyDist,
     utilization: utilGauge,
     concurrentRequests: concurrentGauge,
     latencyMetrics,
-  }));
+  });
 
   const workFn = opts.work;
 
   class Driver extends Blueprint {
-    params = { pool: component.ref(ResourcePool) };
+    static params = { pool: component.ref(ResourcePool) };
+    declare params: typeof Driver.params;
     engineOnStart() {
       void this.run();
     }
@@ -99,7 +92,7 @@ function buildPoolModel(opts: {
     }
   }
 
-  model.create("driver", Driver, () => ({ pool }));
+  model.create("driver", Driver, { pool });
 
   const controller = createEngine(model, {
     seed: opts.seed ?? "test",
@@ -115,7 +108,8 @@ describe("ResourcePool defaults", () => {
     const pool = model.create("pool", ResourcePool);
 
     class Driver extends Blueprint {
-      params = { pool: component.ref(ResourcePool) };
+      static params = { pool: component.ref(ResourcePool) };
+      declare params: typeof Driver.params;
       engineOnStart() {
         void this.run();
       }
@@ -127,7 +121,7 @@ describe("ResourcePool defaults", () => {
       }
     }
 
-    model.create("driver", Driver, () => ({ pool }));
+    model.create("driver", Driver, { pool });
 
     const controller = createEngine(model, { seed: "defaults", duration: 100 });
     await controller.run();

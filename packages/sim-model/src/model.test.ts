@@ -6,27 +6,28 @@ import { createModel } from "./model";
 import type { StyleRuleDescriptor } from "./style-rule-descriptor";
 
 class TestPool extends Blueprint {
-  params = { capacity: component.capacity() };
+  static params = { capacity: component.capacity() };
+  declare params: typeof TestPool.params;
 }
 
 class TestDB extends Blueprint {
-  params = { pool: component.ref(TestPool) };
+  static params = { pool: component.ref(TestPool) };
+  declare params: typeof TestDB.params;
 }
 
 class TestNodeWithFrameworkSentinel extends Node {
-  params = {};
   frameworkField = component.param();
 }
 
 describe("model", () => {
   describe("model-create", () => {
-    it("model.create('pool', TestPool, thunk) returns a TestPool instance", () => {
+    it("model.create returns an instance with name set and the static schema recorded", () => {
       const model = createModel();
-      const instance = model.create("pool", TestPool, () => ({ capacity: 10 }));
+      const instance = model.create("pool", TestPool, { capacity: 10 });
       expect(instance).toBeInstanceOf(TestPool);
       expect(instance.name).toBe("pool");
-      expect(instance.params.capacity).toBeDefined();
-      expect(isSentinel(instance.params.capacity)).toBe(true);
+      // Before introspection, Class.params still holds sentinels
+      expect(isSentinel(TestPool.params.capacity)).toBe(true);
 
       const reg = model.registrations.find((r) => r.name === "pool")!;
       expect(reg.paramsSchema.capacity.kind).toBe("capacity");
@@ -34,77 +35,90 @@ describe("model", () => {
 
     it("registration has undefined label when opts is omitted", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }));
+      model.create("pool", TestPool, { capacity: 10 });
       const reg = model.registrations.find((r) => r.name === "pool")!;
       expect(reg.label).toBeUndefined();
     });
 
     it("registration stores label when opts.label is provided", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }), {
-        label: "My Label",
-      });
+      model.create("pool", TestPool, { capacity: 10 }, { label: "My Label" });
       const reg = model.registrations.find((r) => r.name === "pool")!;
       expect(reg.label).toBe("My Label");
     });
 
     it("registration has undefined label when opts.label is explicitly undefined", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }), {
-        label: undefined,
-      });
+      model.create("pool", TestPool, { capacity: 10 }, { label: undefined });
       const reg = model.registrations.find((r) => r.name === "pool")!;
       expect(reg.label).toBeUndefined();
     });
 
     it("registration stores description when opts.description is provided", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }), {
-        description: "A pool for database connections",
-      });
+      model.create(
+        "pool",
+        TestPool,
+        { capacity: 10 },
+        { description: "A pool for database connections" },
+      );
       const reg = model.registrations.find((r) => r.name === "pool")!;
       expect(reg.description).toBe("A pool for database connections");
     });
 
     it("registration has undefined description when opts is omitted", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }));
+      model.create("pool", TestPool, { capacity: 10 });
       const reg = model.registrations.find((r) => r.name === "pool")!;
       expect(reg.description).toBeUndefined();
     });
-
-    it("thunk can include label and description in return type", () => {
-      const model = createModel();
-      // Should compile without type errors
-      model.create("pool", TestPool, () => ({
-        capacity: 10,
-        label: "From Thunk",
-        description: "Thunk desc",
-      }));
-      // Thunk metadata is extracted during introspection, not create().
-      // See introspect.test.ts for the full round-trip test.
-    });
   });
 
-  describe("model-create-no-thunk", () => {
-    it("model.create without thunk stores an empty-object thunk", () => {
+  describe("model-create-no-params", () => {
+    it("model.create without params arg stores an empty pendingParams", () => {
       class AllDefaults extends Node {
-        params = { rate: component.rate(42) };
+        static params = { rate: component.rate(42) };
+        declare params: typeof AllDefaults.params;
       }
       const model = createModel();
       const instance = model.create("ad", AllDefaults);
       expect(instance).toBeInstanceOf(AllDefaults);
       const reg = model.registrations.find((r) => r.name === "ad")!;
-      // The stored thunk should return an empty object (defaults applied during introspection)
-      expect(reg.thunk()).toEqual({});
+      expect(reg.pendingParams).toEqual({});
+    });
+  });
+
+  describe("model-wire-circular", () => {
+    it("wire() merges into pendingParams for post-creation hookup", () => {
+      const model = createModel();
+      const pool = model.create("pool", TestPool, { capacity: 5 });
+      const db = model.create("db", TestDB);
+      db.wire({ pool });
+      const reg = model.registrations.find((r) => r.name === "db")!;
+      expect(reg.pendingParams).toEqual({ pool });
+    });
+
+    it("wire() on an unregistered instance throws", () => {
+      const detached = new TestPool();
+      expect(() => detached.wire({ capacity: 1 })).toThrow(/not registered/);
+    });
+  });
+
+  describe("model-create-duplicate-names", () => {
+    it("throws when the same name is reused", () => {
+      const model = createModel();
+      model.create("pool", TestPool, { capacity: 1 });
+      expect(() => model.create("pool", TestPool, { capacity: 2 })).toThrow(
+        /duplicate name 'pool'/,
+      );
     });
   });
 
   describe("model-schema", () => {
     it("paramsSchema reflects sentinel structure: ref has kind ref and target", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 5 }));
-      model.create("db", TestDB, () => ({ pool }));
+      const pool = model.create("pool", TestPool, { capacity: 5 });
+      model.create("db", TestDB, { pool });
       const registrations = model.registrations;
       const poolReg = registrations.find((r) => r.name === "pool");
       const dbReg = registrations.find((r) => r.name === "db");
@@ -127,7 +141,7 @@ describe("model", () => {
   describe("model-framework-sentinels", () => {
     it("Blueprint has empty frameworkSentinels (engine is not a sentinel)", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 5 }));
+      model.create("pool", TestPool, { capacity: 5 });
       const reg = model.registrations.find((r) => r.name === "pool");
 
       expect(reg!.frameworkSentinels).toEqual([]);
@@ -135,7 +149,7 @@ describe("model", () => {
 
     it("class with sentinel outside params records it in frameworkSentinels", () => {
       const model = createModel();
-      model.create("n", TestNodeWithFrameworkSentinel, () => ({}));
+      model.create("n", TestNodeWithFrameworkSentinel);
       const reg = model.registrations.find((r) => r.name === "n");
 
       expect(reg!.frameworkSentinels).toHaveLength(1);
@@ -149,9 +163,9 @@ describe("model", () => {
   describe("model-registrations", () => {
     it("all registered nodes are enumerable via model.registrations in insertion order", () => {
       const model = createModel();
-      const pool = model.create("first", TestPool, () => ({ capacity: 1 }));
-      model.create("second", TestDB, () => ({ pool }));
-      model.create("third", TestPool, () => ({ capacity: 3 }));
+      const pool = model.create("first", TestPool, { capacity: 1 });
+      model.create("second", TestDB, { pool });
+      model.create("third", TestPool, { capacity: 3 });
       const regs = model.registrations;
       expect(regs).toHaveLength(3);
       expect(regs[0].name).toBe("first");
@@ -161,10 +175,16 @@ describe("model", () => {
   });
 
   describe("model-type-safety", () => {
-    it("thunk returning wrong shape for params produces compile error", () => {
+    it("passing a value of the wrong type for a param produces a compile error", () => {
       const model = createModel();
       // @ts-expect-error — capacity should be number, not string
-      model.create("bad", TestPool, () => ({ capacity: "wrong" }));
+      model.create("bad", TestPool, { capacity: "wrong" });
+    });
+
+    it("passing an unknown key produces a compile error", () => {
+      const model = createModel();
+      // @ts-expect-error — 'foo' is not a key of TestPool.params
+      model.create("bad", TestPool, { capacity: 1, foo: 2 });
     });
   });
 
@@ -180,7 +200,8 @@ describe("model", () => {
 
     it("registration captures defaultInstanceStyleRules from a subclass that overrides it", () => {
       class StyledPool extends Blueprint {
-        params = { capacity: component.capacity() };
+        static params = { capacity: component.capacity() };
+        declare params: typeof StyledPool.params;
         defaultInstanceStyleRules() {
           return [
             {
@@ -191,7 +212,7 @@ describe("model", () => {
         }
       }
       const model = createModel();
-      model.create("sp", StyledPool, () => ({ capacity: 1 }));
+      model.create("sp", StyledPool, { capacity: 1 });
       const reg = model.registrations.find((r) => r.name === "sp")!;
       expect(reg.defaultInstanceStyleRules).toBeDefined();
       expect(reg.defaultInstanceStyleRules).toHaveLength(1);
@@ -202,14 +223,13 @@ describe("model", () => {
 
     it("registration has undefined defaultInstanceStyleRules when Blueprint returns []", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 5 }));
+      model.create("pool", TestPool, { capacity: 5 });
       const reg = model.registrations.find((r) => r.name === "pool")!;
       expect(reg.defaultInstanceStyleRules).toBeUndefined();
     });
 
     it("sub-subclass can call super.defaultInstanceStyleRules() to inherit and extend", () => {
       class BaseStyled extends Blueprint {
-        params = {};
         defaultInstanceStyleRules(): StyleRuleDescriptor[] {
           return [{ match: { id: this.name }, style: { opacity: 0.5 } }];
         }
@@ -223,7 +243,7 @@ describe("model", () => {
         }
       }
       const model = createModel();
-      model.create("d", DerivedStyled, () => ({}));
+      model.create("d", DerivedStyled);
       const reg = model.registrations.find((r) => r.name === "d")!;
       expect(reg.defaultInstanceStyleRules).toHaveLength(2);
       expect(reg.defaultInstanceStyleRules![0].style).toEqual(
@@ -236,7 +256,6 @@ describe("model", () => {
 
     it("static defaultStyleRules chains via super in sub-subclasses", () => {
       class BaseClass extends Blueprint {
-        params = {};
         static defaultStyleRules() {
           return [
             {

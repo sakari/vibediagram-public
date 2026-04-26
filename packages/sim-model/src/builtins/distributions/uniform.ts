@@ -2,7 +2,9 @@ import { component } from "../../sentinel";
 import { Distribution } from "../../distribution";
 
 export class Uniform extends Distribution {
-  params = { min: component.capacity(), max: component.capacity() };
+  static params = { min: component.capacity(), max: component.capacity() };
+  declare params: typeof Uniform.params;
+
   /** Returns a sample uniformly distributed in [min, max). */
   draw(): number {
     return (

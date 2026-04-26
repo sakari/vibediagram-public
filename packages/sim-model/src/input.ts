@@ -47,13 +47,15 @@ export class InputNode extends Node {
     ];
   }
 
-  params = {
+  static params = {
     kind: component.param("number"),
     defaultValue: component.capacity(0),
     min: component.capacity(0),
     max: component.capacity(100),
     step: component.capacity(1),
   };
+
+  declare params: typeof InputNode.params;
 
   private _value: number = 0;
 

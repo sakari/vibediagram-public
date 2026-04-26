@@ -2,7 +2,9 @@ import { component } from "../../sentinel";
 import { Distribution } from "../../distribution";
 
 export class LogNormal extends Distribution {
-  params = { mu: component.capacity(), sigma: component.capacity() };
+  static params = { mu: component.capacity(), sigma: component.capacity() };
+  declare params: typeof LogNormal.params;
+
   /**
    * Returns a log-normally distributed sample.
    * mu and sigma are the mean and std-dev of the underlying normal.

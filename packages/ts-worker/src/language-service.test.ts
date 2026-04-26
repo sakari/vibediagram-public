@@ -713,7 +713,7 @@ describe("VFS module resolution", () => {
       "/main.ts",
       'import { metrics, createModel } from "@diagram/sim-model";\n' +
         "const model = createModel();\n" +
-        'const qps = model.create<metrics.Counter<"count">>("qps", metrics.Counter, () => ({ unit: "count" }));',
+        'const qps = model.create<metrics.Counter<"count">>("qps", metrics.Counter, { unit: "count" });',
     );
     const diags = host.getDiagnostics("/main.ts");
     expect(diags).toEqual([]);

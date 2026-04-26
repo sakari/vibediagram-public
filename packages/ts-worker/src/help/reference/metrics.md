@@ -23,7 +23,7 @@ Latest-value gauge for point-in-time measurements.
 const utilization = model.create<metrics.Gauge<"ratio">>(
   "utilization",
   metrics.Gauge,
-  () => ({ unit: "ratio" }),
+  { unit: "ratio" },
 );
 
 // In a Blueprint:
@@ -64,11 +64,12 @@ Use `{}` (empty labels) when no partitioning is needed.
 
 ```typescript
 class MyNode extends Blueprint {
-  params = {
+  static params = {
     qps: component.ref(metrics.Counter),
     utilization: component.ref(metrics.Gauge),
     latency: component.ref(metrics.Summary),
   };
+  declare params: typeof MyNode.params;
 }
 ```
 

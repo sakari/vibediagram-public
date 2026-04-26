@@ -10,15 +10,14 @@ Adds sampled delay to simulate network or processing latency.
 **Params**: `{ latency: Distribution, metrics: Summary }`
 
 ```typescript
-const dist = model.create("dist", distributions.Exponential, () => ({
-  mean: 0.005,
-}));
+const dist = model.create("dist", distributions.Exponential, { mean: 0.005 });
 const latencyMetrics = model.create("latency", metrics.Summary);
-const link = model.create("link", blueprints.LatencyBlueprint, () => ({
-  latency: dist,
-  metrics: latencyMetrics,
-  description: "Database query latency",
-}));
+const link = model.create(
+  "link",
+  blueprints.LatencyBlueprint,
+  { latency: dist, metrics: latencyMetrics },
+  { description: "Database query latency" },
+);
 
 // In a Blueprint:
 await this.params.link.delay(0);
@@ -40,9 +39,12 @@ pools, thread pools, and similar bounded resources.
 - `concurrentRequests: Gauge` — active request count
 
 ```typescript
-const pool = model.create("pool", blueprints.ResourcePool, () => ({
-  label: "Connection Pool",
-}));
+const pool = model.create(
+  "pool",
+  blueprints.ResourcePool,
+  {},
+  { label: "Connection Pool" },
+);
 
 // In a Blueprint:
 const release = await this.params.pool.acquire();
@@ -59,9 +61,10 @@ Base class for HTTP request handlers. Extend and override `request()`.
 
 ```typescript
 class Backend extends blueprints.HttpServer {
-  params = {
+  static params = {
     pool: component.ref(blueprints.ResourcePool),
   };
+  declare params: typeof Backend.params;
 
   async request(): Promise<HttpResponse> {
     const release = await this.params.pool.acquire();
@@ -92,11 +95,8 @@ Generates HTTP traffic with Poisson arrivals.
 const gen = model.create(
   "traffic",
   blueprints.HttpTrafficGeneratorBlueprint,
-  () => ({
-    target: lb,
-    rate: requestRate,
-    label: "Traffic Generator",
-  }),
+  { target: lb, rate: requestRate },
+  { label: "Traffic Generator" },
 );
 
 gen.onRequest(async () => {
@@ -114,10 +114,12 @@ Distributes HTTP requests across backends using round-robin.
 **Params**: `{ backends: HttpServer[] }`
 
 ```typescript
-const lb = model.create("lb", blueprints.RoundRobinHttpLoadBalancer, () => ({
-  backends: [backend1, backend2, backend3],
-  label: "Load Balancer",
-}));
+const lb = model.create(
+  "lb",
+  blueprints.RoundRobinHttpLoadBalancer,
+  { backends: [backend1, backend2, backend3] },
+  { label: "Load Balancer" },
+);
 
 // Calling lb.request() distributes across backends sequentially
 const response = await lb.request("GET", "/");

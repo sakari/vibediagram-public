@@ -63,10 +63,19 @@ export abstract class Metric<
     ];
   }
 
-  params: MetricParams<Unit> = {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- sentinel pattern: placeholder stands in for Unit at declaration; engine replaces it before use
-    unit: component.param("count") as unknown as Unit,
+  // Shared static schema across all Metric subclasses. TS `static` cannot
+  // reference class generics, so `unit` is typed as MetricUnit here; the
+  // instance mirror below narrows to the specific `Unit` generic parameter.
+  static params = {
+    unit: component.param("count"),
   };
+
+  /**
+   * Instance-side mirror of the static schema, narrowed by this subclass's
+   * generic Unit. The engine assigns a fully resolved MetricParams<Unit>
+   * during introspection. Declared but uninitialised; user code reads it.
+   */
+  declare params: MetricParams<Unit>;
 
   abstract metrics(): MetricSnapshot<Unit, Labels | OutputLabels>[];
 }
@@ -154,12 +163,13 @@ export class Summary<
     cached: MetricSnapshot<Unit, Labels | "quantile">[];
   }>();
 
-  override params: SummaryParams<Unit> = {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- sentinel pattern: placeholder stands in for Unit at declaration; engine replaces it before use
-    unit: component.param("duration") as unknown as Unit,
+  static override params = {
+    unit: component.param("duration"),
     buckets: component.array(component.capacity(), [0.5, 0.9, 0.99]),
     capacity: component.capacity(1000),
   };
+
+  declare params: SummaryParams<Unit>;
 
   /** Add value to the ring buffer for the given label set. */
   observe(labels: Record<Labels, string>, value: number): void {

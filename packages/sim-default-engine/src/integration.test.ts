@@ -14,7 +14,8 @@ import { createEngine } from "./create-engine";
 // ---------------------------------------------------------------------------
 
 class ResourcePool extends Blueprint {
-  params = { capacity: component.capacity() };
+  static params = { capacity: component.capacity() };
+  declare params: typeof ResourcePool.params;
   private activeCount = 0;
   private waitQueue: Array<() => void> = [];
   slotAcquiredAt!: Float64Array;
@@ -47,7 +48,8 @@ class ResourcePool extends Blueprint {
 }
 
 class Database extends Blueprint {
-  params = { pool: component.ref(ResourcePool) };
+  static params = { pool: component.ref(ResourcePool) };
+  declare params: typeof Database.params;
   async query() {
     const { pool } = this.params;
     await pool.acquire();
@@ -61,11 +63,12 @@ abstract class Server extends Blueprint {
 }
 
 class HttpServer extends Server {
-  params = {
+  static params = {
     requests: component.ref(metrics.Counter<"count", "result">),
     database: component.ref(Database),
     timeout: component.duration(),
   };
+  declare params: typeof HttpServer.params;
 
   async request() {
     const { requests, database, timeout } = this.params;
@@ -79,10 +82,11 @@ class HttpServer extends Server {
 }
 
 class TrafficGenerator extends Blueprint {
-  params = {
+  static params = {
     rate: component.rate(),
     target: component.ref(Server),
   };
+  declare params: typeof TrafficGenerator.params;
 
   engineOnStart() {
     void this.generateTraffic();
@@ -105,24 +109,24 @@ class TrafficGenerator extends Blueprint {
 function buildModel() {
   const model = createModel();
 
-  const pool = model.create("pool", ResourcePool, () => ({ capacity: 3 }));
-  const database = model.create("database", Database, () => ({ pool }));
+  const pool = model.create("pool", ResourcePool, { capacity: 3 });
+  const database = model.create("database", Database, { pool });
   const requests = model.create<metrics.Counter<"count", "result">>(
     "requests",
     metrics.Counter,
-    () => ({
+    {
       unit: "count",
-    }),
+    },
   );
-  const httpServer = model.create("httpServer", HttpServer, () => ({
+  const httpServer = model.create("httpServer", HttpServer, {
     requests,
     database,
     timeout: 0.5,
-  }));
-  model.create("trafficGenerator", TrafficGenerator, () => ({
+  });
+  model.create("trafficGenerator", TrafficGenerator, {
     rate: 100,
     target: httpServer,
-  }));
+  });
 
   return { model, pool };
 }
@@ -213,9 +217,9 @@ describe("integration", () => {
   describe("[integration-distribution-wiring]", () => {
     it("distribution has engine wired after engine creation", () => {
       const model = createModel();
-      const dist = model.create("latency", distributions.Exponential, () => ({
+      const dist = model.create("latency", distributions.Exponential, {
         mean: 0.1,
-      }));
+      });
       createEngine(model, { seed: "dist-test", duration: 1 });
 
       expect(dist.engine).toBeDefined();
@@ -225,9 +229,9 @@ describe("integration", () => {
     it("distribution draw is deterministic with same seed", () => {
       const run = () => {
         const model = createModel();
-        const dist = model.create("latency", distributions.Exponential, () => ({
+        const dist = model.create("latency", distributions.Exponential, {
           mean: 0.5,
-        }));
+        });
         createEngine(model, { seed: "det-test", duration: 1 });
         return Array.from({ length: 20 }, () => dist.draw());
       };
@@ -236,19 +240,20 @@ describe("integration", () => {
 
     it("distribution appears in model registrations", () => {
       const model = createModel();
-      model.create("latency", distributions.Exponential, () => ({ mean: 0.1 }));
+      model.create("latency", distributions.Exponential, { mean: 0.1 });
       const names = model.registrations.map((r) => r.name);
       expect(names).toContain("latency");
     });
 
     it("blueprint can use distribution in engineOnStart", async () => {
       const model = createModel();
-      const dist = model.create("delay", distributions.Exponential, () => ({
+      const dist = model.create("delay", distributions.Exponential, {
         mean: 0.1,
-      }));
+      });
 
       class Worker extends Blueprint {
-        params = { delay: component.ref(distributions.Exponential) };
+        static params = { delay: component.ref(distributions.Exponential) };
+        declare params: typeof Worker.params;
         draws: number[] = [];
         engineOnStart() {
           this.draws.push(this.params.delay.draw());
@@ -256,7 +261,7 @@ describe("integration", () => {
         }
       }
 
-      const worker = model.create("worker", Worker, () => ({ delay: dist }));
+      const worker = model.create("worker", Worker, { delay: dist });
       const controller = createEngine(model, {
         seed: "use-test",
         duration: 1,
@@ -286,25 +291,26 @@ describe("integration", () => {
   describe("[integration-latency-blueprint]", () => {
     function buildLatencyModel() {
       const model = createModel();
-      const dist = model.create("dist", distributions.Exponential, () => ({
+      const dist = model.create("dist", distributions.Exponential, {
         mean: 0.05,
-      }));
+      });
       const latencyMetrics = model.create<metrics.Summary>(
         "latencyMetrics",
         metrics.Summary,
-        () => ({
+        {
           unit: "duration",
           buckets: [0.5, 0.9, 0.99],
           capacity: 1000,
-        }),
+        },
       );
-      const link = model.create("link", blueprints.LatencyBlueprint, () => ({
+      const link = model.create("link", blueprints.LatencyBlueprint, {
         latency: dist,
         metrics: latencyMetrics,
-      }));
+      });
 
       class Caller extends Blueprint {
-        params = { link: component.ref(blueprints.LatencyBlueprint) };
+        static params = { link: component.ref(blueprints.LatencyBlueprint) };
+        declare params: typeof Caller.params;
         engineOnStart() {
           void this.work();
         }
@@ -315,7 +321,7 @@ describe("integration", () => {
         }
       }
 
-      model.create("caller", Caller, () => ({ link }));
+      model.create("caller", Caller, { link });
       return { model };
     }
 

@@ -40,7 +40,7 @@ describe("base", () => {
     it("engine.spawn() throws with descriptive message before wiring", () => {
       const bp = new Blueprint();
       bp.engine = new Engine();
-      expect(() => bp.engine.spawn("x", Node, () => ({}))).toThrow(
+      expect(() => bp.engine.spawn("x", Node, {})).toThrow(
         "Engine not wired — call createEngine() first",
       );
     });
@@ -55,6 +55,13 @@ describe("base", () => {
     it("engine.random() throws with descriptive message before wiring", () => {
       const e = new Engine();
       expect(() => e.random()).toThrow(
+        "Engine not wired — call createEngine() first",
+      );
+    });
+
+    it("engine.now() throws with descriptive message before wiring", () => {
+      const e = new Engine();
+      expect(() => e.now()).toThrow(
         "Engine not wired — call createEngine() first",
       );
     });

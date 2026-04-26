@@ -12,7 +12,8 @@ import {
 import { introspect } from "./introspect";
 
 class TestPool extends Blueprint {
-  params = { capacity: component.capacity() };
+  static params = { capacity: component.capacity() };
+  declare params: typeof TestPool.params;
   started = false;
   engineOnStart() {
     this.started = true;
@@ -20,22 +21,32 @@ class TestPool extends Blueprint {
 }
 
 class TestDB extends Blueprint {
-  params = { pool: component.ref(TestPool) };
+  static params = { pool: component.ref(TestPool) };
+  declare params: typeof TestDB.params;
 }
 
 class TestServer extends Blueprint {
-  params = { db: component.ref(TestDB), timeout: component.duration() };
+  static params = {
+    db: component.ref(TestDB),
+    timeout: component.duration(),
+  };
+  declare params: typeof TestServer.params;
 }
 
 class MultiPool extends Blueprint {
-  params = { pools: component.array(component.ref(TestPool)) };
+  static params = { pools: component.array(component.ref(TestPool)) };
+  declare params: typeof MultiPool.params;
 }
 
 class CycleA extends Blueprint {
-  params = { other: component.ref(CycleB) };
+  // Lazy target form: the arrow defers resolution until introspection, so
+  // CycleB can be referenced before it's declared.
+  static params = { other: component.ref(() => CycleB) };
+  declare params: typeof CycleA.params;
 }
 class CycleB extends Blueprint {
-  params = { other: component.ref(CycleA) };
+  static params = { other: component.ref(CycleA) };
+  declare params: typeof CycleB.params;
 }
 
 function makeEngineFactory(): (name: string) => Engine {
@@ -63,7 +74,7 @@ describe("introspect", () => {
   describe("[resolve-params]", () => {
     it("after resolution instance.params.capacity is the number from the thunk", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 10 }));
+      const pool = model.create("pool", TestPool, { capacity: 10 });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
 
@@ -74,8 +85,8 @@ describe("introspect", () => {
 
     it("instance.params.pool is the TestPool instance", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 10 }));
-      model.create("db", TestDB, () => ({ pool }));
+      const pool = model.create("pool", TestPool, { capacity: 10 });
+      model.create("db", TestDB, { pool });
       const engine = makeEngineFactory();
       introspect(model, engine);
 
@@ -90,7 +101,7 @@ describe("introspect", () => {
 
     it("non-sentinel fields like started are untouched", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 10 }));
+      const pool = model.create("pool", TestPool, { capacity: 10 });
       const engine = makeEngineFactory();
       introspect(model, engine);
 
@@ -101,11 +112,11 @@ describe("introspect", () => {
   describe("[resolve-nested]", () => {
     it("nested model.create inside thunks are discovered and resolved", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 10 }));
-      const server = model.create("server", TestServer, () => ({
-        db: model.create("db", TestDB, () => ({ pool })),
+      const pool = model.create("pool", TestPool, { capacity: 10 });
+      const server = model.create("server", TestServer, {
+        db: model.create("db", TestDB, { pool }),
         timeout: 5,
-      }));
+      });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
 
@@ -125,8 +136,8 @@ describe("introspect", () => {
   describe("[resolve-forward-refs]", () => {
     it("forward references work: a.params.pool === b after resolution", () => {
       const model = createModel();
-      const b = model.create("b", TestPool, () => ({ capacity: 10 }));
-      const a = model.create("a", TestDB, () => ({ pool: b }));
+      const b = model.create("b", TestPool, { capacity: 10 });
+      const a = model.create("a", TestDB, { pool: b });
       const engine = makeEngineFactory();
       introspect(model, engine);
 
@@ -137,9 +148,9 @@ describe("introspect", () => {
   describe("[resolve-composites]", () => {
     it("component.array(component.ref(TestPool)) resolves correctly", () => {
       const model = createModel();
-      const pool1 = model.create("p1", TestPool, () => ({ capacity: 5 }));
-      const pool2 = model.create("p2", TestPool, () => ({ capacity: 10 }));
-      model.create("multi", MultiPool, () => ({ pools: [pool1, pool2] }));
+      const pool1 = model.create("p1", TestPool, { capacity: 5 });
+      const pool2 = model.create("p2", TestPool, { capacity: 10 });
+      model.create("multi", MultiPool, { pools: [pool1, pool2] });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
 
@@ -159,7 +170,7 @@ describe("introspect", () => {
   describe("[resolve-validation-errors]", () => {
     it("missing param throws error naming the field", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({}));
+      model.create("pool", TestPool, {});
       const engine = makeEngineFactory();
 
       expect(() => introspect(model, engine)).toThrow(
@@ -170,7 +181,7 @@ describe("introspect", () => {
     it("wrong type (string instead of number) throws error", () => {
       const model = createModel();
       // @ts-expect-error — deliberately passing string instead of number
-      model.create("pool", TestPool, () => ({ capacity: "10" }));
+      model.create("pool", TestPool, { capacity: "10" });
       const engine = makeEngineFactory();
 
       expect(() => introspect(model, engine)).toThrow(
@@ -180,15 +191,10 @@ describe("introspect", () => {
 
     it("extra key throws error", () => {
       const model = createModel();
-      model.create(
-        "pool",
-        TestPool,
-        () =>
-          ({
-            capacity: 10,
-            extra: "x",
-          }) as { capacity: number },
-      );
+      model.create("pool", TestPool, {
+        capacity: 10,
+        extra: "x",
+      } as { capacity: number });
       const engine = makeEngineFactory();
 
       expect(() => introspect(model, engine)).toThrow(
@@ -200,8 +206,8 @@ describe("introspect", () => {
   describe("[resolve-engine-wired]", () => {
     it("every Blueprint gets a per-node engine facade", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 10 }));
-      model.create("db", TestDB, () => ({ pool }));
+      const pool = model.create("pool", TestPool, { capacity: 10 });
+      model.create("db", TestDB, { pool });
       const engine = makeEngineFactory();
       introspect(model, engine);
 
@@ -219,7 +225,7 @@ describe("introspect", () => {
 
     it("engine.timeout is a function (not throwing the default error)", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }));
+      model.create("pool", TestPool, { capacity: 10 });
       const engine = makeEngineFactory();
       introspect(model, engine);
 
@@ -236,20 +242,21 @@ describe("introspect", () => {
 
   describe("[resolve-record-sentinel]", () => {
     class RecordNode extends Blueprint {
-      params = {
+      static params = {
         config: component.record({
           timeout: component.duration(),
           pool: component.ref(TestPool),
         }),
       };
+      declare params: typeof RecordNode.params;
     }
 
     it("component.record resolves to nested object with validated fields", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 10 }));
-      model.create("rn", RecordNode, () => ({
+      const pool = model.create("pool", TestPool, { capacity: 10 });
+      model.create("rn", RecordNode, {
         config: { timeout: 5, pool },
-      }));
+      });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
 
@@ -265,9 +272,9 @@ describe("introspect", () => {
 
     it("non-object value for record sentinel throws error", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }));
+      model.create("pool", TestPool, { capacity: 10 });
       // @ts-expect-error — deliberately passing string instead of record
-      model.create("rn", RecordNode, () => ({ config: "bad" }));
+      model.create("rn", RecordNode, { config: "bad" });
       const engine = makeEngineFactory();
 
       expect(() => introspect(model, engine)).toThrow(
@@ -277,9 +284,9 @@ describe("introspect", () => {
 
     it("missing key in record sentinel throws error", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 10 }));
+      const pool = model.create("pool", TestPool, { capacity: 10 });
       // @ts-expect-error — deliberately omitting timeout
-      model.create("rn", RecordNode, () => ({ config: { pool } }));
+      model.create("rn", RecordNode, { config: { pool } });
       const engine = makeEngineFactory();
 
       expect(() => introspect(model, engine)).toThrow(/missing key 'timeout'/);
@@ -287,9 +294,9 @@ describe("introspect", () => {
 
     it("array value for record sentinel throws error", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }));
+      model.create("pool", TestPool, { capacity: 10 });
       // @ts-expect-error — deliberately passing array instead of record
-      model.create("rn", RecordNode, () => ({ config: [1, 2] }));
+      model.create("rn", RecordNode, { config: [1, 2] });
       const engine = makeEngineFactory();
 
       expect(() => introspect(model, engine)).toThrow(
@@ -300,12 +307,13 @@ describe("introspect", () => {
 
   describe("[resolve-param-validation]", () => {
     class ParamNode extends Blueprint {
-      params = { tag: component.param() };
+      static params = { tag: component.param() };
+      declare params: typeof ParamNode.params;
     }
 
     it("param accepts string value", () => {
       const model = createModel();
-      model.create("pn", ParamNode, () => ({ tag: "hello" }));
+      model.create("pn", ParamNode, { tag: "hello" });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
       expect(result.registrations).toHaveLength(1);
@@ -313,7 +321,7 @@ describe("introspect", () => {
 
     it("param accepts number value", () => {
       const model = createModel();
-      model.create("pn", ParamNode, () => ({ tag: 42 }));
+      model.create("pn", ParamNode, { tag: 42 });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
       expect(result.registrations).toHaveLength(1);
@@ -321,7 +329,7 @@ describe("introspect", () => {
 
     it("param accepts string[] value", () => {
       const model = createModel();
-      model.create("pn", ParamNode, () => ({ tag: ["a", "b"] }));
+      model.create("pn", ParamNode, { tag: ["a", "b"] });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
       expect(result.registrations).toHaveLength(1);
@@ -330,7 +338,7 @@ describe("introspect", () => {
     it("param with non-string array items throws", () => {
       const model = createModel();
       // @ts-expect-error — deliberately passing number[] instead of string[]
-      model.create("pn", ParamNode, () => ({ tag: [1, 2] }));
+      model.create("pn", ParamNode, { tag: [1, 2] });
       const engine = makeEngineFactory();
       expect(() => introspect(model, engine)).toThrow(
         /param array must contain only strings/,
@@ -340,7 +348,7 @@ describe("introspect", () => {
     it("param with object value throws", () => {
       const model = createModel();
       // @ts-expect-error — deliberately passing object
-      model.create("pn", ParamNode, () => ({ tag: {} }));
+      model.create("pn", ParamNode, { tag: {} });
       const engine = makeEngineFactory();
       expect(() => introspect(model, engine)).toThrow(
         /expected string, number, or string\[\]/,
@@ -352,7 +360,7 @@ describe("introspect", () => {
     it("null ref value throws error", () => {
       const model = createModel();
       // @ts-expect-error — deliberately passing null
-      model.create("db", TestDB, () => ({ pool: null }));
+      model.create("db", TestDB, { pool: null });
       const engine = makeEngineFactory();
       expect(() => introspect(model, engine)).toThrow(
         /expected instance of TestPool, got object/,
@@ -361,13 +369,10 @@ describe("introspect", () => {
 
     it("wrong class ref value throws error", () => {
       const model = createModel();
-      // @ts-expect-error — deliberately passing wrong ref type (TestDB instead of TestPool)
-      const db = model.create("db", TestDB, () => ({
-        pool: model.create("pool2", TestDB, () => ({
-          pool: model.create("pool3", TestPool, () => ({ capacity: 1 })),
-        })),
-      }));
-      void db;
+      const pool3 = model.create("pool3", TestPool, { capacity: 1 });
+      const pool2 = model.create("pool2", TestDB, { pool: pool3 });
+      // @ts-expect-error — deliberately passing a TestDB where a TestPool is required
+      model.create("db", TestDB, { pool: pool2 });
       const engine = makeEngineFactory();
       expect(() => introspect(model, engine)).toThrow(
         /expected instance of TestPool, got TestDB/,
@@ -377,7 +382,7 @@ describe("introspect", () => {
     it("non-array value for array sentinel throws error", () => {
       const model = createModel();
       // @ts-expect-error — deliberately passing string instead of array
-      model.create("multi", MultiPool, () => ({ pools: "bad" }));
+      model.create("multi", MultiPool, { pools: "bad" });
       const engine = makeEngineFactory();
       expect(() => introspect(model, engine)).toThrow(
         /expected array, got string/,
@@ -388,10 +393,10 @@ describe("introspect", () => {
   describe("[resolve-ref-constructor-fallback]", () => {
     it("ref with Object.create(null) reports 'unknown' in error message", () => {
       const model = createModel();
-      model.create("db", TestDB, () => ({
+      model.create("db", TestDB, {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- deliberately passing object without constructor
         pool: Object.create(null) as TestPool,
-      }));
+      });
       const engine = makeEngineFactory();
       expect(() => introspect(model, engine)).toThrow(
         /expected instance of TestPool, got unknown/,
@@ -402,7 +407,7 @@ describe("introspect", () => {
   describe("[resolve-unknown-sentinel-kind]", () => {
     it("unknown sentinel kind throws descriptive error", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }));
+      model.create("pool", TestPool, { capacity: 10 });
       // Inject a sentinel with an unknown kind into the registration
       const reg = model.registrations[0];
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- injecting invalid sentinel for test
@@ -410,8 +415,7 @@ describe("introspect", () => {
         [SENTINEL]: true,
         kind: "banana",
       } as unknown as SentinelMarker;
-      const origThunk = reg.thunk;
-      reg.thunk = () => ({ ...origThunk(), fake: 42 });
+      reg.pendingParams = { ...reg.pendingParams, fake: 42 };
 
       const engine = makeEngineFactory();
       expect(() => introspect(model, engine)).toThrow(
@@ -423,12 +427,12 @@ describe("introspect", () => {
   describe("[resolve-topo-order]", () => {
     it("linear chain Pool → DB → Server gives startOrder [Pool, DB, Server]", () => {
       const model = createModel();
-      const pool = model.create("pool", TestPool, () => ({ capacity: 10 }));
-      const db = model.create("db", TestDB, () => ({ pool }));
-      const server = model.create("server", TestServer, () => ({
+      const pool = model.create("pool", TestPool, { capacity: 10 });
+      const db = model.create("db", TestDB, { pool });
+      const server = model.create("server", TestServer, {
         db,
         timeout: 5,
-      }));
+      });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
 
@@ -440,23 +444,29 @@ describe("introspect", () => {
 
     it("cycle A refs B, B refs A: order matches registration order", () => {
       const model = createModel();
-      const bHolder: { ref: CycleB | undefined } = { ref: undefined };
-      const aRef = model.create("a", CycleA, () => ({ other: bHolder.ref! }));
-      const bRef = model.create("b", CycleB, () => ({ other: aRef }));
-      bHolder.ref = bRef;
+      const aRef = model.create("a", CycleA);
+      const bRef = model.create("b", CycleB, { other: aRef });
+      aRef.wire({ other: bRef });
       const engine = makeEngineFactory();
       const result = introspect(model, engine);
 
       expect(result.startOrder).toHaveLength(2);
       expect(result.startOrder[0]).toBe(aRef);
       expect(result.startOrder[1]).toBe(bRef);
+      // Resolved params point at the counterpart on both sides — the
+      // lazy `component.ref(() => CycleB)` target plus `.wire()` for the
+      // back-edge produce the same topology the old thunk-based test
+      // exercised.
+      expect(aRef.params.other).toBe(bRef);
+      expect(bRef.params.other).toBe(aRef);
     });
   });
 
   describe("[resolve-defaults]", () => {
     it("primitive defaultValue fills missing thunk fields", () => {
       class DefaultPool extends Blueprint {
-        params = { capacity: component.capacity(42) };
+        static params = { capacity: component.capacity(42) };
+        declare params: typeof DefaultPool.params;
       }
 
       const model = createModel();
@@ -470,11 +480,12 @@ describe("introspect", () => {
 
     it("ref defaultFactory auto-creates the referenced node when thunk omits the field", () => {
       class WithCounter extends Blueprint {
-        params = {
+        static params = {
           qps: component.ref(metrics.Counter, (m, name) =>
             m.create(name, metrics.Counter),
           ),
         };
+        declare params: typeof WithCounter.params;
       }
 
       const model = createModel();
@@ -497,20 +508,21 @@ describe("introspect", () => {
 
     it("ref defaultFactory does not override an explicitly provided value", () => {
       class WithCounter extends Blueprint {
-        params = {
+        static params = {
           qps: component.ref(metrics.Counter, (m, name) =>
             m.create(name, metrics.Counter),
           ),
         };
+        declare params: typeof WithCounter.params;
       }
 
       const model = createModel();
-      const explicit = model.create("my-counter", metrics.Counter, () => ({
+      const explicit = model.create("my-counter", metrics.Counter, {
         unit: "byte",
-      }));
-      model.create("test", WithCounter, () => ({
+      });
+      model.create("test", WithCounter, {
         qps: explicit,
-      }));
+      });
       const engine = makeEngineFactory();
       introspect(model, engine);
 
@@ -523,12 +535,14 @@ describe("introspect", () => {
 
     it("nested ref defaults: factory-created node can itself have defaults", () => {
       class Inner extends Node {
-        params = { rate: component.rate(100) };
+        static params = { rate: component.rate(100) };
+        declare params: typeof Inner.params;
       }
       class Outer extends Blueprint {
-        params = {
+        static params = {
           child: component.ref(Inner, (m, name) => m.create(name, Inner)),
         };
+        declare params: typeof Outer.params;
       }
 
       const model = createModel();
@@ -545,53 +559,36 @@ describe("introspect", () => {
     });
   });
 
-  describe("[resolve-thunk-metadata]", () => {
-    it("copies label from thunk result onto registration", () => {
+  describe("[resolve-metadata]", () => {
+    it("label from opts is stored on the registration", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({
-        capacity: 10,
-        label: "My Pool",
-      }));
+      model.create("pool", TestPool, { capacity: 10 }, { label: "My Pool" });
       const result = introspect(model, makeEngineFactory());
       const reg = result.registrations.find((r) => r.name === "pool")!;
       expect(reg.label).toBe("My Pool");
     });
 
-    it("copies description from thunk result onto registration", () => {
+    it("description from opts is stored on the registration", () => {
       const model = createModel();
-      model.create("pool", TestPool, () => ({
-        capacity: 10,
-        description: "A connection pool",
-      }));
+      model.create(
+        "pool",
+        TestPool,
+        { capacity: 10 },
+        { description: "A connection pool" },
+      );
       const result = introspect(model, makeEngineFactory());
       const reg = result.registrations.find((r) => r.name === "pool")!;
       expect(reg.description).toBe("A connection pool");
     });
 
-    it("thunk metadata takes precedence over opts", () => {
+    it("params object rejects label/description as compile error", () => {
       const model = createModel();
-      model.create(
-        "pool",
-        TestPool,
-        () => ({ capacity: 10, label: "Thunk", description: "Thunk desc" }),
-        { label: "Opts", description: "Opts desc" },
-      );
-      const result = introspect(model, makeEngineFactory());
-      const reg = result.registrations.find((r) => r.name === "pool")!;
-      expect(reg.label).toBe("Thunk");
-      expect(reg.description).toBe("Thunk desc");
-    });
-
-    it("falls back to opts when thunk has no metadata", () => {
-      const model = createModel();
-      model.create("pool", TestPool, () => ({ capacity: 10 }), {
-        label: "Opts Label",
-        description: "Opts desc",
-      });
-      const result = introspect(model, makeEngineFactory());
-      const reg = result.registrations.find((r) => r.name === "pool")!;
-      expect(reg.label).toBe("Opts Label");
-      expect(reg.description).toBe("Opts desc");
+      // @ts-expect-error — label must go in opts, not params
+      model.create("p1", TestPool, { capacity: 10, label: "nope" });
+      // @ts-expect-error — description must go in opts, not params
+      model.create("p2", TestPool, { capacity: 10, description: "nope" });
+      // The runtime validator also rejects extra keys, so introspect() throws.
+      expect(() => introspect(model, makeEngineFactory())).toThrow(/extra key/);
     });
   });
 });

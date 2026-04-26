@@ -25,44 +25,38 @@ class TestHttpServer extends HttpServer {
 function buildWired(seed: string, rate: number) {
   const model = createModel();
 
-  const dist = model.create("arrival-dist", Exponential, () => ({
-    mean: 1,
-  }));
+  const dist = model.create("arrival-dist", Exponential, { mean: 1 });
 
-  const rateInput = model.create("rate", InputNode, () => ({
+  const rateInput = model.create("rate", InputNode, {
     kind: "number" as const,
     defaultValue: rate,
     min: 1,
     max: 200,
     step: 1,
-  }));
+  });
 
   const latencyMetric = model.create<Summary<"duration">>(
     "req-latency",
     Summary,
-    () => ({ unit: "duration", buckets: [0.5, 0.95, 0.99], capacity: 1000 }),
+    { unit: "duration", buckets: [0.5, 0.95, 0.99], capacity: 1000 },
   );
 
   const statusMetric = model.create<Counter<"count", "status">>(
     "req-status",
     Counter,
-    () => ({ unit: "count" }),
+    { unit: "count" },
   );
 
   // Target HttpServer that handles requests
-  const target = model.create("target", TestHttpServer, () => ({}));
+  const target = model.create("target", TestHttpServer);
 
-  const generator = model.create(
-    "traffic-gen",
-    HttpTrafficGeneratorBlueprint,
-    () => ({
-      arrivalDistribution: dist,
-      rate: rateInput,
-      latency: latencyMetric,
-      statusCounts: statusMetric,
-      target,
-    }),
-  );
+  const generator = model.create("traffic-gen", HttpTrafficGeneratorBlueprint, {
+    arrivalDistribution: dist,
+    rate: rateInput,
+    latency: latencyMetric,
+    statusCounts: statusMetric,
+    target,
+  });
 
   // Wire distribution engine
   const distEngine = createTestEngine(seed + ":dist");
@@ -253,11 +247,9 @@ describe("HttpTrafficGeneratorBlueprint", () => {
 describe("HttpTrafficGeneratorBlueprint defaults", () => {
   it("can be created with only target — other params use ref defaults", () => {
     const model = createModel();
-    const target = model.create("target", HttpServer, () => ({}));
+    const target = model.create("target", HttpServer);
 
-    model.create("gen", HttpTrafficGeneratorBlueprint, () => ({
-      target,
-    }));
+    model.create("gen", HttpTrafficGeneratorBlueprint, { target });
 
     const controller = createEngine(model, { seed: "defaults", duration: 0 });
 

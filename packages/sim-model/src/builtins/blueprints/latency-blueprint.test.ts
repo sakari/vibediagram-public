@@ -9,16 +9,16 @@ import { Engine } from "../../blueprint";
 
 function buildWired(seed: string, mean: number) {
   const model = createModel();
-  const dist = model.create("dist", Exponential, () => ({ mean }));
-  const summary = model.create<Summary>("metrics", Summary, () => ({
+  const dist = model.create("dist", Exponential, { mean });
+  const summary = model.create("metrics", Summary, {
     unit: "duration",
     buckets: [0.5, 0.9, 0.99],
     capacity: 1000,
-  }));
-  const lb = model.create("lb", LatencyBlueprint, () => ({
+  });
+  const lb = model.create("lb", LatencyBlueprint, {
     latency: dist,
     metrics: summary,
-  }));
+  });
 
   // Wire engines manually for unit testing
   const distEngine = createTestEngine(seed + ":dist");
@@ -91,19 +91,19 @@ describe("LatencyBlueprint", () => {
 
   it("works with Normal distribution", async () => {
     const model = createModel();
-    const dist = model.create("dist", Normal, () => ({
+    const dist = model.create("dist", Normal, {
       mean: 0.05,
       stddev: 0.01,
-    }));
-    const summary = model.create<Summary>("metrics", Summary, () => ({
+    });
+    const summary = model.create("metrics", Summary, {
       unit: "duration",
       buckets: [0.5, 0.9, 0.99],
       capacity: 1000,
-    }));
-    const lb = model.create("lb", LatencyBlueprint, () => ({
+    });
+    const lb = model.create("lb", LatencyBlueprint, {
       latency: dist,
       metrics: summary,
-    }));
+    });
 
     dist.engine = createTestEngine("normal-test:dist");
     dist.params = { mean: 0.05, stddev: 0.01 };

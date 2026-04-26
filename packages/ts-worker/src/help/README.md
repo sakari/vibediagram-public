@@ -35,7 +35,6 @@ does something:
 import { Blueprint, createModel } from "@diagram/sim-model";
 
 class Ping extends Blueprint {
-  params = {};
   engineOnStart() {
     void this.run();
   }
@@ -87,41 +86,71 @@ Math.random();
 
 ### Params and topology
 
-Declare params with sentinel factories. Each `component.ref()` creates
-a diagram edge from this node to the referenced node.
+Declare params as a `static` field on the class using sentinel
+factories, and add an instance mirror via `declare params: typeof
+ClassName.params` so method bodies can read `this.params.*` with
+full type safety. Each `component.ref()` creates a diagram edge from
+this node to the referenced node.
 
 ```typescript
 class Cache extends Blueprint {
-  params = {
+  static params = {
     db: component.ref(Database), // edge: Cache -> Database
     hitRate: component.ref(metrics.Gauge), // edge: Cache -> hitRate gauge
     ttl: component.ref(InputNode), // edge: Cache -> ttl slider
   };
+
+  declare params: typeof Cache.params;
 }
 ```
 
 ### Wiring with model.create()
 
-The thunk (third argument) supplies concrete values for params.
-Params declared with a default at the `component.xxx(...)` call site
-can be omitted from the thunk — e.g. `component.ref(Database, () => ...)`,
+The third argument supplies concrete values for params as a plain
+object. Params declared with a default at the `component.xxx(...)`
+call site can be omitted — e.g. `component.ref(Database, (m, n) => …)`,
 `component.capacity(10)`, `component.rate(100)` — and will be filled in
 automatically.
 
+A fourth `opts` argument carries display metadata (`label`,
+`description`). Keep these out of the params object.
+
 ```typescript
 const db = model.create("db", Database);
-const hitRate = model.create<metrics.Gauge<"ratio">>(
-  "hitRate",
-  metrics.Gauge,
-  () => ({
-    unit: "ratio",
-  }),
+const hitRate = model.create<metrics.Gauge<"ratio">>("hitRate", metrics.Gauge, {
+  unit: "ratio",
+});
+model.create(
+  "cache",
+  Cache,
+  { db, hitRate },
+  { description: "In-memory cache with TTL" },
 );
-model.create("cache", Cache, () => ({
-  db,
-  hitRate,
-  description: "In-memory cache with TTL",
-}));
+```
+
+### Circular references
+
+When two nodes reference each other, create one first and use `.wire()`
+to attach the back-edge after both exist:
+
+```typescript
+const queue = model.create("queue", Queue);
+const producer = model.create("producer", Producer, { queue });
+queue.wire({ producer });
+```
+
+Forward class references inside a `static params` schema use the
+arrow form of `component.ref`:
+
+```typescript
+class A extends Blueprint {
+  static params = { b: component.ref(() => B) };
+  declare params: typeof A.params;
+}
+class B extends Blueprint {
+  static params = { a: component.ref(A) };
+  declare params: typeof B.params;
+}
 ```
 
 ### Metrics
@@ -152,15 +181,15 @@ Available on `this.engine` inside Blueprint methods:
 - `random()` — seeded pseudorandom [0, 1)
 - `halt(reason)` — stop the simulation
 - `now()` — current simulated time in seconds
-- `spawn(name, Class, thunk?)` — create nodes dynamically at runtime;
+- `spawn(name, Class, params?)` — create nodes dynamically at runtime;
   spawned nodes appear in the diagram as they are created
 
 ```typescript
 // Dynamic spawning example
 async scaleUp() {
-  const worker = this.engine.spawn("worker-2", Worker, () => ({
+  const worker = this.engine.spawn("worker-2", Worker, {
     pool: this.params.pool,
-  }));
+  });
 }
 ```
 
@@ -175,9 +204,11 @@ See [styling reference](reference/styling.md) for full details.
 
 ```typescript
 class Server extends Blueprint {
-  params = {
+  static params = {
     link: component.ref(blueprints.LatencyBlueprint),
   };
+  declare params: typeof Server.params;
+
   async handleRequest() {
     await this.params.link.delay(0);
     // process...
