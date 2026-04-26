@@ -404,18 +404,30 @@ const DiagramWorkspace: React.FC = () => {
     leftPaneClass = "left-pane";
   }
 
-  const editorToggle = (
-    <button
-      type="button"
-      className="editor-collapse-toggle"
-      onClick={() => {
-        setEditorCollapsed((prev) => !prev);
-      }}
-      aria-label={collapseLabel}
-      title={collapseLabel}
-    >
-      {collapseIcon}
-    </button>
+  const leadingControls = (
+    <>
+      <button
+        type="button"
+        className="sim-btn sim-btn-back"
+        onClick={() => {
+          navigate("/projects");
+        }}
+        title="Back to all projects"
+      >
+        {"← All projects"}
+      </button>
+      <button
+        type="button"
+        className="editor-collapse-toggle"
+        onClick={() => {
+          setEditorCollapsed((prev) => !prev);
+        }}
+        aria-label={collapseLabel}
+        title={collapseLabel}
+      >
+        {collapseIcon}
+      </button>
+    </>
   );
 
   return (
@@ -438,7 +450,7 @@ const DiagramWorkspace: React.FC = () => {
           sim.setSpeed(v);
         }}
         onSetTimeWindow={setTimeWindow}
-        leading={editorToggle}
+        leading={leadingControls}
         projectTitle={document.title}
         onTitleChange={
           isReadOnly
