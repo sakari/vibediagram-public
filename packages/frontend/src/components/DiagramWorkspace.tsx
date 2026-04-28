@@ -30,7 +30,10 @@ import { JazzFileStoreAdapter } from "../jazz/JazzFileStoreAdapter";
 import { SIM_MODEL_EXTRA_LIBS, HELP_FILE_ENTRIES } from "../sim/ambient-types";
 import { bundle } from "@diagram/sim-worker";
 import { formatMetricValue } from "@diagram/sim-model";
-import { JAZZ_API_KEY_STORAGE_KEY } from "../jazz-api-key";
+import {
+  JAZZ_API_KEY_STORAGE_KEY,
+  JAZZ_LOCAL_ONLY_STORAGE_KEY,
+} from "../jazz-api-key";
 
 const NODE_TYPES = { metric: MetricNode, simInput: InputNode };
 const TS_CONFIG = { module: "ESNext", moduleResolution: "Bundler" };
@@ -95,6 +98,28 @@ const DiagramWorkspace: React.FC = () => {
   const [timeWindow, setTimeWindow] = useState<number | null>(null);
   const [forking, setForking] = useState(false);
   const [versionBannerDismissed, setVersionBannerDismissed] = useState(false);
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+
+  // Local-only mode can never load a shared/cloud-only document. Detect it
+  // up-front so we can show rescue actions immediately instead of spinning.
+  const localOnlyMode =
+    typeof window !== "undefined" &&
+    window.localStorage.getItem(JAZZ_LOCAL_ONLY_STORAGE_KEY) === "true";
+
+  // For cloud-sync users we still want a fallback if the doc never arrives
+  // (bad/expired API key, network issues, wrong id, etc.).
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
+    const handle = setTimeout(() => {
+      setLoadingTimedOut(true);
+    }, 8000);
+    return () => {
+      clearTimeout(handle);
+    };
+  }, [isLoading]);
 
   const readOnlyTreeFiles = useMemo(
     () => [
@@ -369,10 +394,43 @@ const DiagramWorkspace: React.FC = () => {
   }
 
   if (isLoading) {
+    const showRescue = localOnlyMode || loadingTimedOut;
     return (
       <div className="loading-container">
         <h2>Loading diagram...</h2>
-        <p>Please wait while we load your diagram.</p>
+        {showRescue ? (
+          <>
+            <p>
+              {localOnlyMode
+                ? "You're in local-only mode, so shared projects from the cloud can't load. Add a Jazz API key to view this one."
+                : "This is taking longer than expected. If this is a shared link, your Jazz API key may be missing or invalid."}
+            </p>
+            <div className="loading-rescue-actions">
+              <button
+                type="button"
+                className="loading-rescue-primary"
+                onClick={() => {
+                  window.localStorage.removeItem(JAZZ_LOCAL_ONLY_STORAGE_KEY);
+                  window.localStorage.removeItem(JAZZ_API_KEY_STORAGE_KEY);
+                  window.location.reload();
+                }}
+              >
+                Set up Jazz API key
+              </button>
+              <button
+                type="button"
+                className="loading-rescue-secondary"
+                onClick={() => {
+                  navigate("/projects");
+                }}
+              >
+                Back to my projects
+              </button>
+            </div>
+          </>
+        ) : (
+          <p>Please wait while we load your diagram.</p>
+        )}
       </div>
     );
   }

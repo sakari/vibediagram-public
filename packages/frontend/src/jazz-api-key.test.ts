@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveJazzSyncConfig } from "./jazz-api-key";
+import { resolveJazzSyncConfig, isSharedDiagramPath } from "./jazz-api-key";
 
 describe("resolveJazzSyncConfig", () => {
   it("returns env sync peer when ws:// is provided", () => {
@@ -72,5 +72,29 @@ describe("resolveJazzSyncConfig", () => {
         peer: "wss://cloud.jazz.tools/?key=my-key",
       });
     });
+  });
+});
+
+describe("isSharedDiagramPath", () => {
+  it("matches a diagram view URL", () => {
+    expect(isSharedDiagramPath("/diagram/abc123")).toBe(true);
+  });
+
+  it("matches a diagram URL with trailing slash", () => {
+    expect(isSharedDiagramPath("/diagram/abc123/")).toBe(true);
+  });
+
+  it("does not match the bare /diagram path", () => {
+    expect(isSharedDiagramPath("/diagram")).toBe(false);
+    expect(isSharedDiagramPath("/diagram/")).toBe(false);
+  });
+
+  it("does not match the project list", () => {
+    expect(isSharedDiagramPath("/projects")).toBe(false);
+    expect(isSharedDiagramPath("/")).toBe(false);
+  });
+
+  it("does not match nested paths under a diagram id", () => {
+    expect(isSharedDiagramPath("/diagram/abc123/edit")).toBe(false);
   });
 });

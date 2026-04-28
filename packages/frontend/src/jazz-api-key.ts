@@ -4,6 +4,17 @@ export const JAZZ_API_KEY_STORAGE_KEY = "vibediagram-jazz-api-key";
 /** localStorage key indicating the user chose local-only mode (no cloud sync). */
 export const JAZZ_LOCAL_ONLY_STORAGE_KEY = "vibediagram-local-only";
 
+/**
+ * True if `pathname` refers to a single shared/owned diagram view
+ * (i.e. matches `/diagram/:diagramId`). Used to give the API-key setup
+ * modal context-aware copy: opening someone's shared link without cloud
+ * sync would leave the user stuck on a perpetual "Loading..." screen.
+ */
+export function isSharedDiagramPath(pathname: string): boolean {
+  const match = /^\/diagram\/([^/]+)\/?$/.exec(pathname);
+  return match !== null && match[1].length > 0;
+}
+
 type SyncConfig =
   | { peer: `wss://${string}` | `ws://${string}` }
   | { when: "never" };

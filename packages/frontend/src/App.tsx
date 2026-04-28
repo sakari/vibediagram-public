@@ -9,6 +9,7 @@ import "./App.css";
 import {
   JAZZ_API_KEY_STORAGE_KEY,
   JAZZ_LOCAL_ONLY_STORAGE_KEY,
+  isSharedDiagramPath,
   resolveJazzSyncConfig,
 } from "./jazz-api-key";
 import { bootstrapApiKeyFromHash } from "./bootstrap-api-key";
@@ -27,6 +28,10 @@ function getJazzSyncConfig() {
 /** Prompt the user to enter their Jazz API key before the app can start. */
 function ApiKeySetup() {
   const [apiKey, setApiKey] = React.useState("");
+  // Cloud sync is required to load a shared diagram by URL — without it the
+  // user lands on a perpetual "Loading..." screen. Show context-aware copy
+  // and route the local-only button somewhere they can actually use.
+  const onSharedDiagram = isSharedDiagramPath(window.location.pathname);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -37,17 +42,29 @@ function ApiKeySetup() {
 
   function handleLocalOnly() {
     localStorage.setItem(JAZZ_LOCAL_ONLY_STORAGE_KEY, "true");
-    window.location.reload();
+    if (onSharedDiagram) {
+      // Don't strand the user on a URL their offline session can't load.
+      window.location.replace("/projects");
+    } else {
+      window.location.reload();
+    }
   }
+
+  const title = onSharedDiagram
+    ? "Open shared project"
+    : "Welcome to VibeDiagram";
+  const subtitle = onSharedDiagram
+    ? "Shared projects live in Jazz cloud sync. Enter a free Jazz API key to open this one."
+    : "Enter your Jazz API key to enable cloud sync, or use locally without an account";
+  const localButtonLabel = onSharedDiagram
+    ? "Skip — go to my local projects"
+    : "Use locally without cloud sync";
 
   return (
     <div className="api-key-setup-backdrop">
       <form className="api-key-setup-card" onSubmit={handleSubmit}>
-        <h1 className="api-key-setup-title">Welcome to VibeDiagram</h1>
-        <p className="api-key-setup-subtitle">
-          Enter your Jazz API key to enable cloud sync, or use locally without
-          an account
-        </p>
+        <h1 className="api-key-setup-title">{title}</h1>
+        <p className="api-key-setup-subtitle">{subtitle}</p>
         <a
           className="api-key-setup-link"
           href="https://jazz.tools/docs/react/quickstart#get-your-free-api-key"
@@ -78,8 +95,14 @@ function ApiKeySetup() {
           type="button"
           onClick={handleLocalOnly}
         >
-          Use locally without cloud sync
+          {localButtonLabel}
         </button>
+        {onSharedDiagram && (
+          <p className="api-key-setup-hint">
+            Skipping won't load this shared project — local-only mode can't
+            reach the cloud.
+          </p>
+        )}
       </form>
     </div>
   );

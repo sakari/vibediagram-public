@@ -236,6 +236,53 @@
   margin-bottom: 2rem;
 }
 
+.loading-container h2 {
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.loading-container p {
+  color: #ccc;
+  margin-bottom: 1.5rem;
+  max-width: 30rem;
+}
+
+.loading-rescue-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.loading-rescue-primary,
+.loading-rescue-secondary {
+  padding: 0.55rem 1.1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.loading-rescue-primary {
+  background: #3498db;
+  color: #fff;
+  border: none;
+}
+
+.loading-rescue-primary:hover {
+  background: #2980b9;
+}
+
+.loading-rescue-secondary {
+  background: transparent;
+  color: #aaa;
+  border: 1px solid #555;
+}
+
+.loading-rescue-secondary:hover {
+  background: #2a2a2a;
+  color: #ccc;
+}
+
 .title-input {
   padding: 0.5rem;
   border: 1px solid #555;
@@ -730,6 +777,13 @@
 .api-key-setup-local-button:hover {
   background: #2a2a2a;
   color: #ccc;
+}
+
+.api-key-setup-hint {
+  margin: 0;
+  color: #888;
+  font-size: 0.8rem;
+  text-align: center;
 }
 
 /* ---------- API Key Settings Widget ---------- */
