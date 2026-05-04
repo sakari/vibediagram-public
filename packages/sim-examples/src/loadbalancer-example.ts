@@ -19,12 +19,14 @@ class Backend extends blueprints.HttpServer {
   declare params: typeof Backend.params;
 
   async request(): Promise<HttpResponse> {
-    const ok = await this.params.pool.acquire(5);
-    if (!ok) return { status: 503 };
-
-    this.params.qps.increment({});
-    this.params.pool.release();
-    return { status: 200 };
+    const result = await this.params.pool.use<HttpResponse>(
+      () => {
+        this.params.qps.increment({});
+        return { status: 200 };
+      },
+      { timeout: 5 },
+    );
+    return result ?? { status: 503 };
   }
 }
 

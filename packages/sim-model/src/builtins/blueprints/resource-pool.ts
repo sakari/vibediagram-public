@@ -10,7 +10,7 @@
  * - base_sample is drawn from the pluggable latency Distribution wired
  *   via params.latency (e.g. Exponential, Uniform, LogNormal — any
  *   Distribution subclass)
- * - utilization = active / capacity (clamped to [0, 1))
+ * - utilization = active / capacity (clamped to [0, 1) for the formula)
  * - k = scaling exponent (params.scalingExponent.value, default 1.0)
  *
  * When k=1 this is the classic M/M/1 queuing model from queuing theory
@@ -21,8 +21,10 @@
  * - k>1: steeper degradation — GC pressure, lock contention
  * - k<1: gentler curve — systems with effective backpressure
  *
- * Waiters are served in FIFO order: the longest-waiting caller gets the
- * next released slot.
+ * Admission is strict FIFO: every caller enqueues, no fast lane. Capacity
+ * is read live on every admission decision, so changing the capacity input
+ * at runtime takes effect immediately and the bound `active <= capacity` is
+ * never violated.
  */
 
 import { Blueprint } from "../../blueprint";
@@ -31,6 +33,7 @@ import { Gauge, Summary } from "../../metric";
 import { InputNode } from "../../input";
 import { component, type DefaultFactory } from "../../sentinel";
 import { Exponential } from "../distributions/exponential";
+import { AsyncSemaphore } from "./async-semaphore";
 
 /**
  * Default factory that creates an InputNode with the given params.
@@ -85,116 +88,83 @@ export class ResourcePool extends Blueprint {
 
   declare params: typeof ResourcePool.params;
 
-  private active = 0;
-  private waitQueue: Array<() => void> = [];
-
-  /** Update the concurrentRequests gauge for both active and waiting states. */
-  private updateConcurrentRequests(): void {
-    this.params.concurrentRequests.set({ state: "active" }, this.active);
-    this.params.concurrentRequests.set(
-      { state: "waiting" },
-      this.waitQueue.length,
-    );
-  }
+  private sem = new AsyncSemaphore(() => this.params.capacity.value);
 
   /**
-   * Acquire a resource from the pool.
+   * Run `fn` while holding a slot in the pool.
    *
-   * If a slot is free, reserves it immediately. If the pool is full, waits
-   * for a slot to be released. If `timeout` is provided and fires before
-   * the resource is acquired *and* the service latency completes, returns
-   * false without reserving.
+   * The caller enqueues, waits for admission (strict FIFO), then incurs
+   * the utilization-scaled service latency before `fn` runs. The slot is
+   * released automatically when `fn` settles, even if it throws.
    *
-   * The timeout covers the entire acquire lifecycle: both the queuing wait
-   * and the service latency delay. This matches real-world semantics where
-   * a caller's deadline applies to the total operation time.
-   *
-   * Once a slot is reserved, samples latency from the distribution, scales
-   * it by the power-law formula, and advances simulation time. Returns true
-   * when the full service delay has elapsed.
+   * If `timeout` is provided and fires before `fn` starts running (i.e.
+   * during the queue wait or service latency), the call returns `null`
+   * without invoking `fn`. The timeout covers the entire pre-`fn`
+   * lifecycle, matching real-world deadline semantics.
    */
-  async acquire(timeout?: number): Promise<boolean> {
-    const cap = this.params.capacity.value;
+  async use<T>(
+    fn: () => Promise<T> | T,
+    opts?: { timeout?: number },
+  ): Promise<T | null> {
     const start = this.engine.now();
-
-    // When no timeout, use a promise that never resolves so the same
-    // Promise.race logic works for both paths.
+    const timeout = opts?.timeout;
     const timeoutPromise =
       timeout !== undefined
         ? this.engine.timeout(timeout).then(() => "timeout" as const)
         : new Promise<"timeout">(() => {});
 
-    // Step 1: wait for a free slot if at capacity.
-    if (this.active >= cap) {
-      const waiter = { cb: (): void => {} };
-      const result = await Promise.race([
-        new Promise<"acquired">((resolve) => {
-          waiter.cb = () => {
-            resolve("acquired");
-          };
-          this.waitQueue.push(waiter.cb);
-          this.updateConcurrentRequests();
-        }),
-        timeoutPromise,
-      ]);
-      if (result === "timeout") {
-        // Remove ourselves from the wait queue if still queued
-        const idx = this.waitQueue.indexOf(waiter.cb);
-        if (idx !== -1) this.waitQueue.splice(idx, 1);
-        this.updateConcurrentRequests();
-        this.params.latencyMetrics.observe({}, this.engine.now() - start);
-        return false;
-      }
-      // We were woken — waiting count decreased (callback was shift()ed by release)
-      this.updateConcurrentRequests();
+    const ticket = this.sem.acquire();
+    this.publishMetrics();
+
+    const admitResult = await Promise.race([
+      ticket.admitted.then(() => "admitted" as const),
+      timeoutPromise,
+    ]);
+
+    if (admitResult === "timeout" && ticket.cancel()) {
+      this.publishMetrics();
+      this.params.latencyMetrics.observe({}, this.engine.now() - start);
+      return null;
     }
 
-    // Reserve the slot.
-    this.active++;
-    const utilization = this.active / cap;
-    this.params.utilization.set({}, utilization);
-    this.updateConcurrentRequests();
+    // Either admitted normally, or timeout fired but admission already won
+    // the race — in the latter case we hold a real slot and must release.
+    this.publishMetrics();
 
-    // Step 2: service latency scaled by power-law: base / (1 - utilization)^k
-    const base = this.params.latency.draw();
+    const cap = this.params.capacity.value;
+    const u = Math.min(this.sem.inUse / cap, 0.999);
     const k = this.params.scalingExponent.value;
-    const clampedUtil = Math.min(utilization, 0.999);
-    const scaled = Math.max(0, base / Math.pow(1 - clampedUtil, k));
+    const base = this.params.latency.draw();
+    const scaled = Math.max(0, base / Math.pow(1 - u, k));
 
     const latencyResult = await Promise.race([
       this.engine.timeout(scaled).then(() => "done" as const),
       timeoutPromise,
     ]);
 
-    const elapsed = this.engine.now() - start;
-    this.params.latencyMetrics.observe({}, elapsed);
-
     if (latencyResult === "timeout") {
-      // Release the slot — we couldn't complete within the timeout.
-      this.active--;
-      this.params.utilization.set({}, this.active / cap);
-      this.updateConcurrentRequests();
-      const next = this.waitQueue.shift();
-      if (next) next();
-      return false;
+      this.sem.release();
+      this.publishMetrics();
+      this.params.latencyMetrics.observe({}, this.engine.now() - start);
+      return null;
     }
 
-    return true;
+    try {
+      return await fn();
+    } finally {
+      this.sem.release();
+      this.publishMetrics();
+      this.params.latencyMetrics.observe({}, this.engine.now() - start);
+    }
   }
 
-  /**
-   * Release a resource back to the pool. Decrements active count,
-   * updates utilization gauge, and wakes the next queued waiter (FIFO).
-   */
-  release(): void {
-    if (this.active <= 0) return;
-    this.active--;
+  private publishMetrics(): void {
     const cap = this.params.capacity.value;
-    this.params.utilization.set({}, this.active / cap);
-
-    // Wake the next waiter (FIFO order).
-    const next = this.waitQueue.shift();
-    if (next) next();
-    this.updateConcurrentRequests();
+    // Clamp to [0, 1]: if capacity was reduced below the current active count,
+    // the unclamped ratio exceeds 1, which is meaningless for "fraction of
+    // capacity in use". The overcommit is still observable via concurrentRequests.
+    this.params.utilization.set({}, Math.min(this.sem.inUse / cap, 1));
+    this.params.concurrentRequests.set({ state: "active" }, this.sem.inUse);
+    this.params.concurrentRequests.set({ state: "waiting" }, this.sem.queued);
   }
 }
