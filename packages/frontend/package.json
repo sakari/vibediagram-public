@@ -17,6 +17,7 @@
     "@diagram/diagram-view": "workspace:^",
     "@diagram/editor": "workspace:^",
     "@diagram/jazz-schema": "workspace:^",
+    "@diagram/markdown-view": "workspace:^",
     "@diagram/sim-examples": "workspace:^",
     "@diagram/sim-model": "workspace:^",
     "@diagram/sim-worker": "workspace:^",

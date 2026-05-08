@@ -24,6 +24,7 @@ import { VibeDiagramAccount } from "../jazz/schema";
 import { JazzProjectStore } from "../stores/JazzProjectStore";
 import SimControls from "./SimControls";
 import MetricNode from "./MetricNode";
+import { MarkdownPreview } from "@diagram/markdown-view";
 import { useSimulation } from "../hooks/useSimulation";
 import { useMetricHistory } from "../hooks/useMetricHistory";
 import { JazzFileStoreAdapter } from "../jazz/JazzFileStoreAdapter";
@@ -295,6 +296,31 @@ const DiagramWorkspace: React.FC = () => {
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     };
   }, []);
+
+  // Track content of the active .md file for the right-pane preview.
+  // Read-only help files supply their content inline; project files are read
+  // from the FileStore and re-read whenever it emits a change event.
+  const [markdownSource, setMarkdownSource] = useState<string | null>(null);
+  useEffect(() => {
+    if (!activeFile || !activeFile.endsWith(".md")) {
+      setMarkdownSource(null);
+      return;
+    }
+    const readOnly = allReadOnlyFiles.find((f) => f.path === activeFile);
+    if (readOnly) {
+      setMarkdownSource(readOnly.content);
+      return;
+    }
+    if (!fileStore) {
+      setMarkdownSource(null);
+      return;
+    }
+    setMarkdownSource(fileStore.readFile(activeFile) ?? "");
+    const unsubscribe = fileStore.onFileChange((path, content) => {
+      if (path === activeFile) setMarkdownSource(content);
+    });
+    return unsubscribe;
+  }, [activeFile, allReadOnlyFiles, fileStore]);
 
   const handleReset = useCallback(() => {
     sim.reset();
@@ -622,7 +648,9 @@ const DiagramWorkspace: React.FC = () => {
           </div>
         </div>
         <div className="right-pane">
-          {enrichedSpec ? (
+          {markdownSource !== null ? (
+            <MarkdownPreview source={markdownSource} />
+          ) : enrichedSpec ? (
             <DiagramRenderer
               spec={enrichedSpec}
               nodeTypes={NODE_TYPES}
