@@ -12,6 +12,54 @@ Typical uses: sketching system architectures, exploring "what if"
 capacity questions, teaching distributed-systems concepts, or
 prototyping before you build.
 
+## Collaborate from anywhere
+
+This project lives in Jazz, a local-first CRDT database that syncs
+through Jazz Cloud. The same project can be edited concurrently from
+three surfaces — every change shows up live everywhere else:
+
+- **In the browser** — open the project in the web app with reader or
+  writer access and edit the model alongside the live diagram.
+- **In your own editor** — mount the project as a local filesystem
+  with [`fuse-mirror`](https://github.com/sakari/vibediagram-public/blob/main/packages/fuse-mirror/README.md)
+  and edit files in VS Code, Neovim, or drive an agent CLI (Claude
+  Code, Codex, …) over the same mount.
+- **With Claude Code on the web** — point a cloud Claude Code session
+  at a [fuse-mirror](https://github.com/sakari/vibediagram-public/blob/main/packages/fuse-mirror/README.md)
+  mount of this project; its edits appear instantly in any open
+  browser tab.
+
+```mermaid
+graph LR
+    subgraph Collaborators
+        Browser["👤 Human<br/>in browser<br/>(reader / writer)"]
+        Local["👤 Human<br/>on local machine<br/>(editor + agent CLI)"]
+        Cloud["🤖 Claude Code<br/>on the web"]
+    end
+
+    WebApp["VibeDiagram web app<br/>(editor + live diagram)"]
+    FuseLocal["fuse-mirror<br/>(local FUSE mount)"]
+    FuseCloud["fuse-mirror<br/>(cloud FUSE mount)"]
+
+    JazzCloud[("Jazz Cloud<br/>CRDT sync")]
+    Project[["This project<br/>model files + diagram state"]]
+
+    Browser <-->|"HTTPS / WebSocket"| WebApp
+    WebApp <--> JazzCloud
+
+    Local <-->|"file I/O"| FuseLocal
+    FuseLocal <-->|"jazz-tools worker"| JazzCloud
+
+    Cloud <-->|"file I/O"| FuseCloud
+    FuseCloud <-->|"jazz-tools worker"| JazzCloud
+
+    JazzCloud <--> Project
+```
+
+Use **Shared Access** on the Projects page to grant a person — or a
+fuse-mirror worker account — `reader` or `writer` access to this
+project.
+
 ## What you'll see
 
 - **Diagram pane** — nodes from `model.create()` with edges from `component.ref()`
