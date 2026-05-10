@@ -1,8 +1,21 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, waitFor, fireEvent, cleanup } from "@testing-library/react";
+import { EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+
+afterEach(() => {
+  cleanup();
+});
+
+class StubResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+Object.assign(globalThis, { ResizeObserver: StubResizeObserver });
 
 vi.mock("mermaid", () => ({
   default: {
@@ -64,5 +77,273 @@ describe("MarkdownPreview", () => {
     const code = container.querySelector("code");
     expect(code).not.toBeNull();
     expect(code!.textContent).toBe("inline");
+  });
+
+  it("[mp-critic-inline] renders an inline highlight with a margin bubble", () => {
+    const src =
+      "Hello {==world==}{>>id:abc | by:@alice 2026-01-01T00:00Z: hi<<} done.";
+    const { container } = render(<MarkdownPreview source={src} />);
+    const mark = container.querySelector("mark.vd-comment-anchor");
+    expect(mark).not.toBeNull();
+    expect(mark!.getAttribute("data-thread-id")).toBe("abc");
+    expect(container.querySelector(".vd-comment-margin")).not.toBeNull();
+  });
+
+  it("[mp-critic-block] renders a block sentinel for a standalone block marker", () => {
+    const src =
+      "{>>block id:bk target:next | by:@a 2026-01-01: x<<}\n\n```ts\ncode\n```\n";
+    const { container } = render(<MarkdownPreview source={src} />);
+    expect(
+      container.querySelector(".vd-block-comment[data-thread-id='bk']"),
+    ).not.toBeNull();
+  });
+
+  it("[mp-critic-toggle] clicking the highlight expands the bubble", () => {
+    const src = "Hello {==world==}{>>id:abc | by:@a 2026-01-01: hi<<} done.";
+    const { container } = render(<MarkdownPreview source={src} />);
+    const mark = container.querySelector("mark.vd-comment-anchor");
+    expect(mark).not.toBeNull();
+    fireEvent.click(mark!);
+    expect(
+      container.querySelector(".vd-comment-bubble--expanded"),
+    ).not.toBeNull();
+    fireEvent.click(mark!);
+    expect(container.querySelector(".vd-comment-bubble--expanded")).toBeNull();
+  });
+
+  it("[mp-critic-write] passing editorView shows the new-comment trigger", () => {
+    const view = new EditorView({
+      state: EditorState.create({ doc: "hello world" }),
+    });
+    const { container } = render(
+      <MarkdownPreview source="hello world" editorView={view} />,
+    );
+    // Simulate a selection that resolves to a source range.
+    const p = container.querySelector("p");
+    expect(p).not.toBeNull();
+    const tn = p!.firstChild;
+    if (!(tn instanceof Text)) throw new Error("expected text node");
+    const range = document.createRange();
+    range.setStart(tn, 0);
+    range.setEnd(tn, 5);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+    // Need to wait for state update
+    return waitFor(() => {
+      expect(
+        container.querySelector(".vd-new-comment-trigger") ??
+          container.querySelector(".vd-new-comment-popover"),
+      ).not.toBeNull();
+    });
+  });
+
+  it("[mp-critic-submit] submitting through the popover wraps the source range", async () => {
+    const view = new EditorView({
+      state: EditorState.create({ doc: "hello world" }),
+    });
+    const { container } = render(
+      <MarkdownPreview
+        source="hello world"
+        editorView={view}
+        currentAuthor="alice"
+      />,
+    );
+    const p = container.querySelector("p")!;
+    const tn = p.firstChild;
+    if (!(tn instanceof Text)) throw new Error("expected text node");
+    const range = document.createRange();
+    range.setStart(tn, 0);
+    range.setEnd(tn, 5);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+    const trigger = await waitFor(() => {
+      const t = container.querySelector(".vd-new-comment-trigger");
+      expect(t).not.toBeNull();
+      return t!;
+    });
+    fireEvent.click(trigger);
+    const textarea = container.querySelector("textarea")!;
+    fireEvent.change(textarea, { target: { value: "feedback" } });
+    fireEvent.click(container.querySelector("button[type='submit']")!);
+    expect(view.state.doc.toString()).toContain("{==hello==}{>>id:");
+  });
+
+  it("[mp-critic-second-comment] inserting a second comment after an existing marker lands at the original offset", async () => {
+    // Reproduces the `a x` -> comment a -> comment x bug. The first marker
+    // already wraps `a`, and the user now selects `x`. The popover must
+    // dispatch into CodeMirror at original-source offsets 34..35 — i.e.
+    // outside the existing 33-char marker — instead of corrupting it.
+    const initialMarker = "{==a==}{>>id:c1 | by:@a 2026: t<<}";
+    expect(initialMarker.length).toBe(34);
+    const initialDoc = `${initialMarker} x`;
+    const view = new EditorView({
+      state: EditorState.create({ doc: initialDoc }),
+    });
+    const { container } = render(
+      <MarkdownPreview
+        source={initialDoc}
+        editorView={view}
+        currentAuthor="alice"
+      />,
+    );
+    const p = container.querySelector("p")!;
+    // The paragraph's last text node is ` x` (after the rendered <mark>).
+    const lastChild = p.lastChild;
+    if (!(lastChild instanceof Text)) {
+      throw new Error("expected trailing text node");
+    }
+    const range = document.createRange();
+    range.setStart(lastChild, 1); // before `x`
+    range.setEnd(lastChild, 2); // after `x`
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+    const trigger = await waitFor(() => {
+      const t = container.querySelector(".vd-new-comment-trigger");
+      expect(t).not.toBeNull();
+      return t!;
+    });
+    fireEvent.click(trigger);
+    const textarea = container.querySelector("textarea")!;
+    fireEvent.change(textarea, { target: { value: "new" } });
+    fireEvent.click(container.querySelector("button[type='submit']")!);
+    const result = view.state.doc.toString();
+    // The original marker must remain intact and the new marker must wrap `x`.
+    expect(result.startsWith(initialMarker)).toBe(true);
+    expect(result).toContain("{==x==}{>>id:");
+    // Sanity-check: nothing got inserted inside the existing marker body.
+    expect(result).not.toContain("====}");
+  });
+
+  it("[mp-author-fallback] falls back to anonymous when currentAuthor missing", () => {
+    const src = "Hi {==there==}{>>id:zz | by:@a 2026-01-01: x<<}.";
+    const { container } = render(<MarkdownPreview source={src} />);
+    expect(container.querySelector("mark.vd-comment-anchor")).not.toBeNull();
+  });
+
+  it("[mp-block-trigger] renders a block-level Comment trigger for a fenced code block", () => {
+    const view = new EditorView({
+      state: EditorState.create({ doc: "```ts\nconst x = 1;\n```\n" }),
+    });
+    const { container } = render(
+      <MarkdownPreview
+        source={"```ts\nconst x = 1;\n```\n"}
+        editorView={view}
+      />,
+    );
+    const trigger = container.querySelector(".vd-block-trigger");
+    expect(trigger).not.toBeNull();
+    // The trigger must live next to a <pre> inside the position-relative
+    // wrapper so the absolute placement resolves against the block.
+    const wrapper = trigger!.closest(".vd-block-trigger-wrapper");
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.querySelector("pre")).not.toBeNull();
+  });
+
+  it("[mp-block-trigger-no-view] does not render a block trigger without an editorView", () => {
+    const { container } = render(
+      <MarkdownPreview source={"```ts\nconst x = 1;\n```\n"} />,
+    );
+    expect(container.querySelector(".vd-block-trigger")).toBeNull();
+  });
+
+  it("[mp-pre-suppresses-inline] selecting text inside a <pre> does not show the inline popover", () => {
+    const src = "```ts\nconst x = 1;\n```\n";
+    const view = new EditorView({
+      state: EditorState.create({ doc: src }),
+    });
+    const { container } = render(
+      <MarkdownPreview source={src} editorView={view} />,
+    );
+    const code = container.querySelector("pre code");
+    expect(code).not.toBeNull();
+    const tn = code!.firstChild;
+    if (!(tn instanceof Text)) throw new Error("expected text node");
+    const range = document.createRange();
+    range.setStart(tn, 0);
+    range.setEnd(tn, 5);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+    // After the selection event fires, the inline trigger/form must remain
+    // absent — block-level commenting is the only path inside <pre>.
+    return waitFor(() => {
+      expect(container.querySelector(".vd-new-comment-trigger")).toBeNull();
+      expect(container.querySelector(".vd-new-comment-popover")).toBeNull();
+    });
+  });
+
+  it("[mp-block-existing] block trigger reuses an existing block thread and shows the Open comment label", async () => {
+    const src =
+      "{>>block id:cX target:next | by:@a 2026-01-01: t<<}\n\n```ts\nconst x = 1;\n```\n";
+    const view = new EditorView({ state: EditorState.create({ doc: src }) });
+    const { container } = render(
+      <MarkdownPreview source={src} editorView={view} currentAuthor="alice" />,
+    );
+    // Wait for useThreads' DOM scan to populate markers and the trigger to
+    // re-render in "Open comment" mode.
+    const trigger = await waitFor(() => {
+      const t = container.querySelector(".vd-block-trigger");
+      expect(t).not.toBeNull();
+      expect(t!.textContent).toBe("Open comment");
+      return t!;
+    });
+    fireEvent.click(trigger);
+    // Activating the existing thread expands its margin bubble.
+    await waitFor(() => {
+      expect(
+        container.querySelector(".vd-comment-bubble--expanded"),
+      ).not.toBeNull();
+    });
+  });
+
+  it("[mp-block-second-noop] clicking the trigger on a block that already has a thread does not insert a second marker", async () => {
+    const src =
+      "{>>block id:cX target:next | by:@a 2026-01-01: t<<}\n\n```ts\nconst x = 1;\n```\n";
+    const view = new EditorView({ state: EditorState.create({ doc: src }) });
+    const before = view.state.doc.toString();
+    const { container } = render(
+      <MarkdownPreview source={src} editorView={view} currentAuthor="alice" />,
+    );
+    const trigger = await waitFor(() => {
+      const t = container.querySelector(".vd-block-trigger");
+      expect(t).not.toBeNull();
+      expect(t!.textContent).toBe("Open comment");
+      return t!;
+    });
+    fireEvent.click(trigger);
+    // No new {>>block...<<} marker should have been inserted into the source.
+    expect(view.state.doc.toString()).toBe(before);
+    expect(container.querySelector(".vd-block-trigger-popover")).toBeNull();
+  });
+
+  it("[mp-block-trigger-submit] submitting through the block trigger inserts a block marker", () => {
+    const src = "```ts\nconst x = 1;\n```\n";
+    const view = new EditorView({
+      state: EditorState.create({ doc: src }),
+    });
+    const { container } = render(
+      <MarkdownPreview source={src} editorView={view} currentAuthor="alice" />,
+    );
+    const trigger = container.querySelector(".vd-block-trigger");
+    expect(trigger).not.toBeNull();
+    fireEvent.click(trigger!);
+    const ta = container.querySelector(".vd-block-trigger-popover textarea");
+    if (!(ta instanceof HTMLTextAreaElement))
+      throw new Error("expected textarea");
+    fireEvent.change(ta, { target: { value: "review please" } });
+    const submit = container.querySelector(
+      ".vd-block-trigger-popover button[type='submit']",
+    );
+    fireEvent.click(submit!);
+    expect(view.state.doc.toString()).toMatch(
+      /\{>>block id:[a-z0-9]+ target:next.*: review please<<\}\n\n```ts/,
+    );
   });
 });

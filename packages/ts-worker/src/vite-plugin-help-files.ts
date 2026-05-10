@@ -37,6 +37,10 @@ const HELP_DOCS = [
     virtualPath: "/help/reference/styling.md",
     diskFile: "reference/styling.md",
   },
+  {
+    virtualPath: "/help/reference/comments.md",
+    diskFile: "reference/comments.md",
+  },
 ];
 
 const HELP_EXAMPLES = [

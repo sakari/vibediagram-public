@@ -13,6 +13,7 @@ describe("generateHelpFiles", () => {
       "/help/examples/worker-pool.ts",
       "/help/reference/api-reference.md",
       "/help/reference/builtin-blueprints.md",
+      "/help/reference/comments.md",
       "/help/reference/distributions.md",
       "/help/reference/inputs.md",
       "/help/reference/metrics.md",

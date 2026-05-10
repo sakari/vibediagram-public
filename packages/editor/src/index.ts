@@ -16,6 +16,7 @@ export {
   FileTreePanel,
   type FileTreePanelProps,
 } from "./tree/FileTreePanel.js";
+export { EditorView } from "@codemirror/view";
 export {
   tsExtensions,
   tsLintExtension,

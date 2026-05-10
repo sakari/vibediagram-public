@@ -246,6 +246,12 @@ async scaleUp() {
 Control how nodes look based on state, type, or topology.
 See [styling reference](reference/styling.md) for full details.
 
+### Markdown comments
+
+Add inline comments and threaded discussion to any `.md` file via
+CriticMarkup. See [comments reference](reference/comments.md) for the
+syntax and how to use the preview-pane UI.
+
 ## Common patterns
 
 ### Request-response with latency

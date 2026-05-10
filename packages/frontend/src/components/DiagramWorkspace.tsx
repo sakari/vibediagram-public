@@ -649,7 +649,15 @@ const DiagramWorkspace: React.FC = () => {
         </div>
         <div className="right-pane">
           {markdownSource !== null ? (
-            <MarkdownPreview source={markdownSource} />
+            <MarkdownPreview
+              source={markdownSource}
+              editorView={
+                isReadOnly
+                  ? undefined
+                  : (editorRef.current?.getEditorView() ?? undefined)
+              }
+              currentAuthor={me.profile?.name}
+            />
           ) : enrichedSpec ? (
             <DiagramRenderer
               spec={enrichedSpec}

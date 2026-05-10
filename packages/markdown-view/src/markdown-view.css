@@ -68,3 +68,231 @@
   border-radius: 4px;
   white-space: pre-wrap;
 }
+
+.md-preview--with-margin {
+  position: relative;
+  padding-right: 280px;
+}
+
+.vd-comment-anchor {
+  background: rgba(255, 220, 100, 0.18);
+  color: inherit;
+  border-bottom: 1px dotted rgba(255, 220, 100, 0.6);
+  cursor: pointer;
+}
+
+.vd-comment-anchor--resolved {
+  background: rgba(180, 180, 180, 0.12);
+  border-bottom-color: rgba(180, 180, 180, 0.5);
+}
+
+.vd-block-comment {
+  display: none;
+}
+
+.vd-comment-margin {
+  position: absolute;
+  top: 24px;
+  right: 16px;
+  width: 240px;
+  pointer-events: none;
+}
+
+.vd-comment-bubble {
+  position: absolute;
+  right: 0;
+  width: 100%;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #d4d4d4;
+  font-size: 12px;
+  pointer-events: auto;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.vd-comment-bubble--resolved {
+  opacity: 0.6;
+}
+
+.vd-comment-bubble--collapsed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.vd-comment-bubble-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffcd55;
+}
+
+.vd-comment-bubble--expanded {
+  padding: 8px;
+}
+
+.vd-comment-bubble-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.vd-comment-bubble-close {
+  background: transparent;
+  color: #aaa;
+  border: none;
+  cursor: pointer;
+}
+
+.vd-comment-bubble-messages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.vd-comment-message {
+  padding: 4px 0;
+  border-bottom: 1px solid #333;
+}
+
+.vd-comment-message:last-child {
+  border-bottom: none;
+}
+
+.vd-comment-message-author {
+  font-weight: 600;
+  color: #ffcd55;
+  margin-right: 6px;
+}
+
+.vd-comment-message-ts {
+  font-size: 10px;
+  color: #777;
+}
+
+.vd-comment-message-text {
+  margin: 2px 0 0 0;
+  white-space: pre-wrap;
+}
+
+.vd-comment-bubble-input {
+  width: 100%;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 4px;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.vd-comment-bubble-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.vd-new-comment-trigger,
+.vd-new-comment-popover {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+}
+
+/*
+ * Wrapper around a fenced <pre> that also hosts a block-level "Comment"
+ * affordance positioned in its top-right corner. The wrapper itself is a
+ * normal block box so visual layout matches a standalone <pre>.
+ */
+.vd-block-trigger-wrapper {
+  position: relative;
+}
+
+/*
+ * Hidden by default so visual baselines on documents without comment
+ * interactions stay byte-identical. Shown only on hover (or when the
+ * popover is open and the trigger has hidden itself anyway).
+ */
+.vd-block-trigger {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 5;
+  background: #2a2a2a;
+  color: #d4d4d4;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease-in-out;
+}
+
+.vd-block-trigger-wrapper:hover .vd-block-trigger {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.vd-block-trigger-popover {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 6;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 6px;
+  width: 240px;
+}
+
+.vd-block-trigger-input {
+  width: 100%;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.vd-block-trigger-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.vd-new-comment-popover {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 6px;
+  width: 240px;
+}
+
+.vd-new-comment-input {
+  width: 100%;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.vd-new-comment-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}

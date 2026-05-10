@@ -62,6 +62,13 @@ export interface EditorHandle {
   compile(entryPath: string): Promise<CompileResult>;
   /** Opens a file in a tab. Optionally provide content for files not in the store and a cursor offset. */
   openFile(path: string, fallbackContent?: string, cursorOffset?: number): void;
+  /**
+   * Returns the underlying CodeMirror EditorView, or `null` if the editor has
+   * not finished mounting yet (or has been unmounted). Consumers can use this
+   * to dispatch transactions or read editor state directly — for example, to
+   * drive the editor from another pane (e.g. a markdown preview).
+   */
+  getEditorView(): EditorView | null;
 }
 
 function offsetToLine(
@@ -181,6 +188,9 @@ export const EditorComponent = forwardRef<EditorHandle, EditorProps>(
           cursorOffset?: number,
         ): void {
           managerRef.current?.openFile(path, fallbackContent, cursorOffset);
+        },
+        getEditorView(): EditorView | null {
+          return viewRef.current;
         },
       }),
       [onCompile],
