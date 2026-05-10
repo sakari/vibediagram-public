@@ -1,0 +1,81 @@
+/*
+ * Drawing overlay styles.
+ *
+ * The overlay renders nothing while drawing mode is OFF (see DrawOverlay.tsx),
+ * so these rules only apply when the SVG element is mounted.
+ *
+ * Layering: the parent container is responsible for `position: relative`. The
+ * overlay sits at z-index 4 so it paints above diagram nodes/edges (default
+ * z-index 0) but below React Flow `Controls` (default z-index 5) — see plan
+ * §"SVG overlay z-index".
+ */
+
+.draw-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  /* Default to pointer-events: none so existing strokes are visible but
+     pan / zoom / scroll on the host view still work. The pen tool flips
+     this to `auto`; the eraser keeps it `none` and opts in only on the
+     persisted stroke `<path>` elements (see .draw-overlay-stroke-erasable). */
+  pointer-events: none;
+}
+
+/* Pen mode is the only state that captures the pointer over empty space. */
+.draw-overlay.draw-overlay-pen {
+  pointer-events: auto;
+  cursor: crosshair;
+  /* Disable native touch panning while drawing so a stylus / finger drag
+     produces continuous pointer events instead of being consumed by the
+     browser as a scroll gesture. */
+  touch-action: none;
+}
+
+.draw-overlay-stroke {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+/* Eraser mode keeps pointer-events: none on the background (so pan/zoom
+   still work) but the per-stroke override below makes the painted ink
+   itself clickable. The cursor flips on the painted strokes via
+   .draw-overlay-stroke-erasable. */
+
+/* In eraser mode, persisted strokes become click targets. `pointer-events:
+   stroke` makes the SVG hit-test only the painted ink, not the whole
+   bounding box, so neighbouring strokes don't accidentally swallow each
+   other's clicks. */
+.draw-overlay-stroke-erasable {
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.draw-overlay-cursor {
+  pointer-events: none;
+}
+
+.draw-overlay-cursor-dot {
+  /* Filled by inline `fill` per cursor color. */
+  pointer-events: none;
+}
+
+.draw-overlay-cursor-label {
+  font-size: 12px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+  fill: #fff;
+  /* paint-order + thick semi-transparent stroke gives a readable halo on
+     both light and dark backgrounds without needing a background rect. */
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.7);
+  stroke-width: 3px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
+}

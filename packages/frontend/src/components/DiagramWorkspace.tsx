@@ -19,12 +19,15 @@ import {
   type DiagramNode,
 } from "@diagram/diagram-view";
 import type { InputDescriptor } from "@diagram/sim-model";
-import { useDiagramDocument } from "../hooks/useJazzDB";
+import { useDiagramDocument, createAnnotations } from "../hooks/useJazzDB";
 import { VibeDiagramAccount } from "../jazz/schema";
 import { JazzProjectStore } from "../stores/JazzProjectStore";
 import SimControls from "./SimControls";
 import MetricNode from "./MetricNode";
 import { MarkdownPreview } from "@diagram/markdown-view";
+import { DrawOverlay } from "@diagram/draw-overlay";
+import { JazzAnnotationsBackend } from "../annotations/JazzAnnotationsBackend";
+import { DrawingToolbar, type DrawingState } from "./DrawingToolbar";
 import { useSimulation } from "../hooks/useSimulation";
 import { useMetricHistory } from "../hooks/useMetricHistory";
 import { JazzFileStoreAdapter } from "../jazz/JazzFileStoreAdapter";
@@ -367,6 +370,65 @@ const DiagramWorkspace: React.FC = () => {
     pinToCurrentDeployment();
   }, [pinToCurrentDeployment]);
 
+  // Lazy-bootstrap annotations for projects predating the Annotations field.
+  // Only writers can set new fields on the project; readers see drawing
+  // disabled until any writer has opened the project once. The
+  // `!document.annotations` guard makes re-runs after a successful set a
+  // no-op, so this effect cannot create more than one Annotations CoMap per
+  // session. (Two simultaneous writers may both create one — LWW resolves
+  // it; one CoMap is orphaned. Documented in the plan as acceptable.)
+  useEffect(() => {
+    if (!document || !canWrite) return;
+    if (document.annotations) return;
+    document.$jazz.set("annotations", createAnnotations());
+    document.$jazz.set("updatedAt", new Date().toISOString());
+  }, [document, canWrite]);
+
+  // The Jazz adapter for the drawing overlay. Built once per loaded
+  // annotations CoMap so toggling the toolbar or switching views does not
+  // tear down the underlying Jazz subscription.
+  //
+  // `null` until the bootstrap effect above has populated annotations on
+  // first open (or until a reader is looking at a project no writer has
+  // opened yet). The toolbar and overlay are both gated on this so we
+  // never render a half-wired surface.
+  const annotationsBackend = useMemo(() => {
+    if (!document?.annotations || !me) return null;
+    return new JazzAnnotationsBackend(document.annotations, me);
+  }, [document?.annotations, me]);
+
+  // The toolbar owns the drawing UI state and pushes the latest snapshot
+  // up to us via `onStateChange`. Keeping the state here (rather than
+  // threading callbacks through the toolbar) lets us hand the same fields
+  // to `DrawOverlay` for both views without a context.
+  const [drawState, setDrawState] = useState<DrawingState>({
+    tool: "hand",
+    color: "#ff5252",
+    width: 4,
+  });
+
+  // Clear all strokes for whichever view the user is currently looking at.
+  // We deliberately scope by the active view so a writer cannot wipe
+  // strokes on a view they cannot see; readers never see this control
+  // because the toolbar gates it on `canWrite`.
+  const handleClearStrokes = useCallback(() => {
+    if (!annotationsBackend) return;
+    if (markdownSource !== null) {
+      void annotationsBackend.clearStrokes({
+        view: "markdown",
+        ...(activeFile ? { filePath: activeFile } : {}),
+      });
+    } else {
+      void annotationsBackend.clearStrokes({ view: "diagram" });
+    }
+  }, [annotationsBackend, markdownSource, activeFile]);
+
+  const authorId = me?.$jazz.id ?? "";
+  // Profile name can be undefined on freshly-created accounts before the
+  // user has set one. Fall back to a placeholder so cursor labels always
+  // show something.
+  const authorName = me?.profile?.name ?? "Anonymous";
+
   const showVersionBanner = useMemo(() => {
     if (versionBannerDismissed) return false;
     if (!document?.pinnedDeploymentId) return false;
@@ -648,6 +710,13 @@ const DiagramWorkspace: React.FC = () => {
           </div>
         </div>
         <div className="right-pane">
+          {annotationsBackend && (
+            <DrawingToolbar
+              canWrite={canWrite}
+              onClear={handleClearStrokes}
+              onStateChange={setDrawState}
+            />
+          )}
           {markdownSource !== null ? (
             <MarkdownPreview
               source={markdownSource}
@@ -657,12 +726,47 @@ const DiagramWorkspace: React.FC = () => {
                   : (editorRef.current?.getEditorView() ?? undefined)
               }
               currentAuthor={me.profile?.name}
+              renderOverlay={
+                annotationsBackend
+                  ? (transform) => (
+                      <DrawOverlay
+                        backend={annotationsBackend}
+                        transform={transform}
+                        mode="markdown"
+                        {...(activeFile ? { filePath: activeFile } : {})}
+                        enabled={true}
+                        tool={drawState.tool}
+                        color={drawState.color}
+                        width={drawState.width}
+                        authorId={authorId}
+                        authorName={authorName}
+                      />
+                    )
+                  : undefined
+              }
             />
           ) : enrichedSpec ? (
             <DiagramRenderer
               spec={enrichedSpec}
               nodeTypes={NODE_TYPES}
               className="diagram-pane"
+              renderOverlay={
+                annotationsBackend
+                  ? (transform) => (
+                      <DrawOverlay
+                        backend={annotationsBackend}
+                        transform={transform}
+                        mode="diagram"
+                        enabled={true}
+                        tool={drawState.tool}
+                        color={drawState.color}
+                        width={drawState.width}
+                        authorId={authorId}
+                        authorName={authorName}
+                      />
+                    )
+                  : undefined
+              }
             />
           ) : sim.previewError ? (
             <div className="preview-error">

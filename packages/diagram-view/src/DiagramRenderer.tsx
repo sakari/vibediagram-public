@@ -6,11 +6,13 @@ import {
   Controls,
   useReactFlow,
   useStore,
+  useOnViewportChange,
   type Node,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/base.css";
 import "./diagram-view.css";
+import type { CoordTransform } from "@diagram/draw-overlay";
 import type { DiagramRendererProps } from "./types";
 import { useAutoLayout } from "./useAutoLayout";
 import type { NodeSizeMap } from "./spec-to-elk";
@@ -87,6 +89,7 @@ function DiagramInner({
   onNodeDrag,
   layoutOptions,
   className,
+  renderOverlay,
 }: DiagramRendererProps) {
   const [measuredSizes, setMeasuredSizes] = useState<NodeSizeMap | undefined>();
   const { nodes, edges, layoutReady } = useAutoLayout(
@@ -94,9 +97,61 @@ function DiagramInner({
     layoutOptions,
     measuredSizes,
   );
-  const { getViewport, setViewport } = useReactFlow();
+  const {
+    getViewport,
+    setViewport,
+    screenToFlowPosition,
+    flowToScreenPosition,
+  } = useReactFlow();
   const containerRef = useRef<HTMLDivElement>(null);
   const prevWidthRef = useRef<number | null>(null);
+
+  // Subscribers registered through CoordTransform.subscribe — fired on every
+  // pan/zoom so an attached overlay can re-render against the new viewport
+  // without React itself re-rendering DiagramInner. A Set lets a subscriber
+  // deregister cheaply via the returned unsubscribe.
+  const viewportSubsRef = useRef(new Set<() => void>());
+  useOnViewportChange({
+    onChange: useCallback(() => {
+      for (const cb of viewportSubsRef.current) cb();
+    }, []),
+  });
+
+  // Rebuilt only when the React Flow projection helpers change identity
+  // (effectively once per provider lifetime). Memoising keeps the
+  // CoordTransform reference stable across renders so overlay components
+  // can use it as an effect dependency without infinite loops.
+  const transform = useMemo<CoordTransform>(
+    () => ({
+      toContent(clientX, clientY) {
+        const p = screenToFlowPosition({ x: clientX, y: clientY });
+        return { x: p.x, y: p.y };
+      },
+      toScreen(x, y) {
+        // React Flow returns viewport-pixel coords. The overlay SVG is
+        // positioned at `inset: 0` of the container, so its local origin
+        // is `containerRef.current.getBoundingClientRect().{left,top}`.
+        // Subtract that offset so the caller can use the result as
+        // SVG-local coordinates (path `d`, `<g transform="translate(...)">`).
+        const p = flowToScreenPosition({ x, y });
+        const host = containerRef.current;
+        // Defensive null-guard: the ref attaches before any DOM event
+        // (and thus before the consumer ever calls toScreen). Excluded
+        // from coverage because it's not realistically reachable.
+        /* v8 ignore next */
+        if (!host) return { left: p.x, top: p.y };
+        const r = host.getBoundingClientRect();
+        return { left: p.x - r.left, top: p.y - r.top };
+      },
+      subscribe(cb) {
+        viewportSubsRef.current.add(cb);
+        return () => {
+          viewportSubsRef.current.delete(cb);
+        };
+      },
+    }),
+    [screenToFlowPosition, flowToScreenPosition],
+  );
 
   // Track structural fingerprint to know when to re-measure
   const prevStructureRef = useRef("");
@@ -251,8 +306,19 @@ function DiagramInner({
     );
   }
 
+  const overlayNode = renderOverlay?.(transform);
+
+  // Only add `position: relative` when an overlay is mounted so the
+  // unchanged-DOM invariant for the default (no-overlay) consumer holds
+  // byte-for-byte. The overlay host is `position: absolute; inset: 0` and
+  // needs the container as its positioning ancestor.
+  const containerStyle: React.CSSProperties =
+    overlayNode != null
+      ? { width: "100%", height: "100%", position: "relative" }
+      : { width: "100%", height: "100%" };
+
   return (
-    <div ref={containerRef} style={{ width: "100%", height: "100%" }}>
+    <div ref={containerRef} style={containerStyle}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -267,6 +333,14 @@ function DiagramInner({
         <Background />
         <Controls />
       </ReactFlow>
+      {/* Overlay host. Only mounted when a renderOverlay was supplied so
+          that the default DOM tree is byte-identical to the pre-overlay
+          version (visual regression baselines stay stable). The wrapper
+          itself is pointer-events: none; the overlay opts in to events on
+          its own children so clicks fall through when drawing is off. */}
+      {overlayNode != null ? (
+        <div className="diagram-view-overlay-host">{overlayNode}</div>
+      ) : null}
     </div>
   );
 }

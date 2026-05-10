@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@diagram/diagram-view": "workspace:^",
+    "@diagram/draw-overlay": "workspace:^",
     "@diagram/editor": "workspace:^",
     "@diagram/jazz-schema": "workspace:^",
     "@diagram/markdown-view": "workspace:^",

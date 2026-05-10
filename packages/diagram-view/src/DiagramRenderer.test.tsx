@@ -49,6 +49,7 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
   },
 }));
 
+import type { CoordTransform } from "@diagram/draw-overlay";
 import {
   DiagramRenderer,
   extractChangedSizes,
@@ -141,6 +142,88 @@ describe("DiagramRenderer", () => {
       const rfElement = container.querySelector(".react-flow");
       expect(rfElement).not.toBeNull();
     });
+  });
+
+  it("[dr-overlay-absent] does not mount the overlay host when renderOverlay is omitted", async () => {
+    const { container } = render(
+      <div style={{ width: 800, height: 600 }}>
+        <DiagramRenderer spec={spec} />
+      </div>,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow")).not.toBeNull();
+    });
+
+    // Acceptance: the default DOM is unchanged — no overlay host wrapper.
+    // This is what protects existing visual regression baselines.
+    expect(container.querySelector(".diagram-view-overlay-host")).toBeNull();
+  });
+
+  it("[dr-overlay-transform] passes a working CoordTransform to renderOverlay", async () => {
+    let captured: CoordTransform | null = null;
+    const { container } = render(
+      <div style={{ width: 800, height: 600 }}>
+        <DiagramRenderer
+          spec={spec}
+          renderOverlay={(transform) => {
+            captured = transform;
+            return <div data-testid="test-overlay">overlay</div>;
+          }}
+        />
+      </div>,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow")).not.toBeNull();
+      expect(
+        container.querySelector(".diagram-view-overlay-host"),
+      ).not.toBeNull();
+      expect(captured).not.toBeNull();
+    });
+
+    // The transform should expose the three CoordTransform methods and
+    // the screen<->content round-trip should produce numeric coordinates.
+    // We don't assert exact values — without a real layout box, jsdom's
+    // React Flow projection is degenerate — only that the contract holds.
+    const transform = captured!;
+    const content = transform.toContent(100, 100);
+    expect(content).not.toBeNull();
+    expect(typeof content!.x).toBe("number");
+    expect(typeof content!.y).toBe("number");
+
+    const screen = transform.toScreen(0, 0);
+    expect(screen).not.toBeNull();
+    // Confirm the {x, y} -> {left, top} translation happened.
+    expect(typeof screen!.left).toBe("number");
+    expect(typeof screen!.top).toBe("number");
+  });
+
+  it("[dr-overlay-subscribe] subscribe registers and unregisters callbacks", async () => {
+    let captured: CoordTransform | null = null;
+    render(
+      <div style={{ width: 800, height: 600 }}>
+        <DiagramRenderer
+          spec={spec}
+          renderOverlay={(transform) => {
+            captured = transform;
+            return null;
+          }}
+        />
+      </div>,
+    );
+
+    await waitFor(() => {
+      expect(captured).not.toBeNull();
+    });
+
+    // The contract is "subscribe returns an unsubscribe". We can't easily
+    // fire a viewport change in jsdom, but we can confirm the registration
+    // path doesn't throw and the unsubscribe is a callable function.
+    const cb = vi.fn();
+    const unsubscribe = captured!.subscribe(cb);
+    expect(typeof unsubscribe).toBe("function");
+    unsubscribe();
   });
 
   it("[dr-measuring] renders ReactFlow visible during measurement phase", async () => {

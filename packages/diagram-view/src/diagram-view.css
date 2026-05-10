@@ -35,3 +35,17 @@
   color: #ffffff;
   text-decoration-color: #9090b0;
 }
+
+/* Host for an optional overlay rendered via DiagramRenderer's
+   `renderOverlay` prop. Sits above the React Flow canvas (z-index 4) but
+   below the React Flow Controls (default z-index 5) so the zoom buttons
+   stay clickable. The host itself is pointer-events: none; child elements
+   (e.g. the SVG drawing surface) opt back in to events when active so
+   clicks pass through to the underlying diagram while the overlay is
+   idle. */
+.diagram-view-overlay-host {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}

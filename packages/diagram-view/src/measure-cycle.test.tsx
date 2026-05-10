@@ -59,7 +59,10 @@ vi.mock("@xyflow/react", async () => {
       getViewport: () => ({ x: 0, y: 0, zoom: 1 }),
       setViewport: vi.fn(),
       getNodes: mockGetNodes,
+      screenToFlowPosition: ({ x, y }: { x: number; y: number }) => ({ x, y }),
+      flowToScreenPosition: ({ x, y }: { x: number; y: number }) => ({ x, y }),
     }),
+    useOnViewportChange: () => {},
   };
 });
 

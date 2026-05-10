@@ -5,6 +5,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import type { CoordTransform } from "@diagram/draw-overlay";
 
 afterEach(() => {
   cleanup();
@@ -77,6 +78,90 @@ describe("MarkdownPreview", () => {
     const code = container.querySelector("code");
     expect(code).not.toBeNull();
     expect(code!.textContent).toBe("inline");
+  });
+
+  // Without renderOverlay, the inner overlay-anchor wrapper must not
+  // appear so the existing DOM contract (and any visual baseline that
+  // depends on it) is unchanged.
+  it("[mp-no-overlay] does not render the .md-preview-content wrapper when renderOverlay is omitted", () => {
+    const { container } = render(<MarkdownPreview source="# x" />);
+    expect(container.querySelector(".md-preview-content")).toBeNull();
+    expect(container.querySelector(".md-preview")).not.toBeNull();
+    expect(container.querySelector("h1")).not.toBeNull();
+  });
+
+  // The transform handed to renderOverlay is the contract this preview
+  // exposes. We capture it and then exercise the contract directly.
+  it("[mp-overlay-transform] passes a CoordTransform whose toContent returns a non-null point", () => {
+    let captured: CoordTransform | null = null;
+    const { container } = render(
+      <MarkdownPreview
+        source="# x"
+        renderOverlay={(transform) => {
+          captured = transform;
+          return <div data-testid="overlay" />;
+        }}
+      />,
+    );
+    expect(container.querySelector(".md-preview-content")).not.toBeNull();
+    expect(container.querySelector('[data-testid="overlay"]')).not.toBeNull();
+    expect(captured).not.toBeNull();
+    const point = captured!.toContent(0, 0);
+    expect(point).not.toBeNull();
+    expect(typeof point!.x).toBe("number");
+    expect(typeof point!.y).toBe("number");
+    const screen = captured!.toScreen(0, 0);
+    expect(screen).not.toBeNull();
+    expect(typeof screen!.left).toBe("number");
+    expect(typeof screen!.top).toBe("number");
+  });
+
+  // Subscribing to the transform must surface scroll events on the
+  // outer .md-preview container so the overlay can re-render its
+  // anchored strokes.
+  it("[mp-overlay-scroll] notifies subscribers when the scroll container scrolls", () => {
+    let captured: CoordTransform | null = null;
+    const { container } = render(
+      <MarkdownPreview
+        source="# x"
+        renderOverlay={(transform) => {
+          captured = transform;
+          return null;
+        }}
+      />,
+    );
+    const scrollEl = container.querySelector(".md-preview");
+    expect(scrollEl).not.toBeNull();
+    expect(captured).not.toBeNull();
+    const cb = vi.fn();
+    const unsubscribe = captured!.subscribe(cb);
+    fireEvent.scroll(scrollEl!);
+    expect(cb).toHaveBeenCalledTimes(1);
+    // Unsubscribe stops further notifications.
+    unsubscribe();
+    fireEvent.scroll(scrollEl!);
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  // The transform may outlive the component if a consumer holds a
+  // reference to it (e.g. inside a closure). After unmount, the
+  // scroll container ref is detached, so the transform must safely
+  // return null rather than throwing.
+  it("[mp-overlay-detached] toContent/toScreen return null after unmount", () => {
+    let captured: CoordTransform | null = null;
+    const { unmount } = render(
+      <MarkdownPreview
+        source="# x"
+        renderOverlay={(transform) => {
+          captured = transform;
+          return null;
+        }}
+      />,
+    );
+    expect(captured).not.toBeNull();
+    unmount();
+    expect(captured!.toContent(0, 0)).toBeNull();
+    expect(captured!.toScreen(0, 0)).toBeNull();
   });
 
   it("[mp-critic-inline] renders an inline highlight with a margin bubble", () => {

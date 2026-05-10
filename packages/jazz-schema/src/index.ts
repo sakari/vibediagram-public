@@ -12,6 +12,50 @@ export const FileEntry = co.map({
 export type FileEntry = co.loaded<typeof FileEntry>;
 
 /**
+ * A single freehand stroke drawn on top of either the diagram or markdown view.
+ *
+ * `pointsJson` is a JSON-encoded `number[][]` of `[x, y]` pairs in the host
+ * view's content coordinate space (flow coordinates for diagram, scrollable
+ * content-box coordinates for markdown). A stroke is written once on
+ * `pointerup` and never edited; storing all points as a single string keeps
+ * the per-stroke CRDT footprint to one op rather than one op per point.
+ */
+export const Stroke = co.map({
+  // Stable globally-unique id minted by the overlay before the stroke is
+  // appended. Lets backends and the eraser tool address an individual stroke
+  // without depending on its position in the CoList (which can shift as
+  // other authors splice). The overlay generates this with crypto.randomUUID().
+  id: z.string(),
+  view: z.enum(["diagram", "markdown"]),
+  // Present only for markdown strokes, where it identifies the markdown file
+  // the stroke belongs to. Absent for diagram strokes (one diagram per project).
+  filePath: z.optional(z.string()),
+  // JSON-encoded number[][] of [x, y] points in the host view's content coords.
+  pointsJson: z.string(),
+  color: z.string(),
+  width: z.number(),
+  authorId: z.string(),
+  createdAt: z.string(),
+});
+export type Stroke = co.loaded<typeof Stroke>;
+
+/**
+ * Collaborative drawing surface for a single project.
+ *
+ * `strokes` is the durable list of completed strokes; clearing the surface
+ * means splicing it to empty. `cursors` is a per-session append-only feed of
+ * pointer ticks: each entry is a JSON string carrying
+ * `{view, filePath?, x, y, drawing, name, t}` where `t` is epoch ms. CoFeed
+ * has no built-in TTL, so consumers must hide ticks whose `t` is older than
+ * a small staleness threshold (~2000 ms) client-side.
+ */
+export const Annotations = co.map({
+  strokes: co.list(Stroke),
+  cursors: co.feed(z.string()),
+});
+export type Annotations = co.loaded<typeof Annotations>;
+
+/**
  * A diagram project containing metadata and a list of files.
  * Projects can optionally track which project they were forked from via a string ID.
  */
@@ -27,6 +71,10 @@ export const DiagramProject = co.map({
   pinnedDeploymentId: z.optional(z.string()),
   // Immutable Vercel deployment URL for the pinned preview version.
   pinnedDeploymentUrl: z.optional(z.string()),
+  // Collaborative drawing surface for this project (per-project, lazy-bootstrapped).
+  // Optional so existing projects without an annotations CoMap continue to load;
+  // it is populated the first time a writer opens the project.
+  annotations: co.optional(Annotations),
 });
 export type DiagramProject = co.loaded<typeof DiagramProject>;
 

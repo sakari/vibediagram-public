@@ -1047,3 +1047,113 @@
   color: #e0e0e0;
   border-color: #888;
 }
+
+/* ---------- Drawing toolbar ---------- */
+
+.drawing-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(20, 20, 20, 0.85);
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.drawing-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 1px solid #333;
+}
+
+.drawing-toolbar-toggle {
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background: #333;
+  color: #ccc;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.drawing-toolbar-toggle:hover {
+  background: #444;
+  color: #fff;
+}
+
+.drawing-toolbar-toggle-on {
+  background: #1a73e8;
+  border-color: #1a73e8;
+  color: #fff;
+}
+
+.drawing-toolbar-tool {
+  padding: 3px 8px;
+  font-size: 11px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background: #333;
+  color: #ccc;
+  cursor: pointer;
+}
+
+.drawing-toolbar-tool:hover {
+  background: #444;
+  color: #fff;
+}
+
+.drawing-toolbar-tool-active {
+  background: #555;
+  border-color: #999;
+  color: #fff;
+}
+
+.drawing-toolbar-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid #555;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.drawing-toolbar-swatch-active {
+  border-color: #fff;
+  border-width: 3px;
+}
+
+.drawing-toolbar-width {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background: #333;
+  cursor: pointer;
+}
+
+.drawing-toolbar-width:hover {
+  background: #444;
+}
+
+.drawing-toolbar-width-active {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px #fff;
+}
+
+.drawing-toolbar-width-dot {
+  display: inline-block;
+  background: #ccc;
+  border-radius: 50%;
+}
+
+.drawing-toolbar-clear {
+  margin-left: auto;
+}

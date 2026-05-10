@@ -1,4 +1,5 @@
 import type React from "react";
+import type { CoordTransform } from "@diagram/draw-overlay";
 
 /** 2D coordinate. */
 export interface Point {
@@ -105,6 +106,15 @@ export interface DiagramNodeComponentProps {
  * Props accepted by the DiagramRenderer component.
  *
  * nodeTypes maps DiagramNode.type values to React components.
+ *
+ * `renderOverlay` is a render-prop the consumer uses to mount an overlay
+ * (e.g. the drawing surface from `@diagram/draw-overlay`) on top of the
+ * rendered React Flow canvas. The renderer builds a `CoordTransform` from
+ * the React Flow viewport hooks and hands it to the consumer so the
+ * overlay can map between client and flow-world coordinates without the
+ * consumer (or this package) leaking React Flow types. When omitted, no
+ * overlay host wrapper is mounted at all — guaranteeing that visual
+ * regression baselines do not change for projects that don't opt in.
  */
 export interface DiagramRendererProps {
   readonly spec: DiagramSpec;
@@ -116,4 +126,5 @@ export interface DiagramRendererProps {
   readonly onNodeDrag?: (nodeId: string, position: Point) => void;
   readonly layoutOptions?: LayoutOptions;
   readonly className?: string;
+  readonly renderOverlay?: (transform: CoordTransform) => React.ReactNode;
 }

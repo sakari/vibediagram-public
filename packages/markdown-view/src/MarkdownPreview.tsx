@@ -1,6 +1,14 @@
-import { useCallback, useRef, useState, useMemo, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import type { CoordTransform } from "@diagram/draw-overlay";
 import type { EditorView } from "@codemirror/view";
 import { MermaidBlock } from "./MermaidBlock";
 import {
@@ -18,11 +26,21 @@ import { useThreads } from "./comments/useThreads";
 import { useTextSelection } from "./comments/selection";
 import "./markdown-view.css";
 
-/** @public */
+/**
+ * @public
+ *
+ * `renderOverlay` is the optional integration seam for the drawing overlay.
+ * When supplied, the markdown content is wrapped in an inner
+ * `.md-preview-content` (`position: relative`) container that hosts the
+ * overlay and provides a content-coordinate space the overlay's transform
+ * can anchor to. Strokes scroll with the markdown content rather than
+ * sticking to the viewport.
+ */
 export type MarkdownPreviewProps = {
   readonly source: string;
   readonly editorView?: EditorView;
   readonly currentAuthor?: string;
+  readonly renderOverlay?: (transform: CoordTransform) => ReactNode;
 };
 
 const hasCommentAnchorClass = (cn: unknown): boolean =>
@@ -187,8 +205,13 @@ export function MarkdownPreview({
   source,
   editorView,
   currentAuthor,
+  renderOverlay,
 }: MarkdownPreviewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // Inner content wrapper that hosts the drawing overlay (only mounted
+  // when `renderOverlay` is supplied). Its bounding rect is the
+  // coordinate space the overlay's transform anchors to.
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const handleActivate = useCallback((id: string) => {
     setActiveThreadId((cur) => (cur === id ? null : id));
@@ -218,6 +241,52 @@ export function MarkdownPreview({
   const markers = useThreads(containerRef, source);
   const selection = useTextSelection(containerRef);
 
+  // Drawing-overlay subscribers. Mutable Set rather than React state
+  // because subscribers fire imperatively on scroll; storing in state
+  // would force re-renders and break `useSyncExternalStore` snapshot
+  // identity.
+  const subs = useRef(new Set<() => void>());
+  const transform: CoordTransform = useMemo(
+    () => ({
+      toContent(clientX, clientY) {
+        const el = contentRef.current;
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { x: clientX - r.left, y: clientY - r.top };
+      },
+      toScreen(x, y) {
+        // The SVG sits inside .md-preview-content, so its local origin
+        // is the content wrapper's top-left and a content-coord (x, y)
+        // is also the SVG-local point. We still null-guard for an
+        // unmounted-then-captured transform.
+        const el = contentRef.current;
+        if (!el) return null;
+        return { left: x, top: y };
+      },
+      subscribe(cb) {
+        subs.current.add(cb);
+        return () => {
+          subs.current.delete(cb);
+        };
+      },
+    }),
+    [],
+  );
+
+  // Notify drawing-overlay subscribers on scroll so strokes re-position.
+  useEffect(() => {
+    const el = containerRef.current;
+    /* v8 ignore next */
+    if (!el) return;
+    const onScroll = () => {
+      for (const cb of Array.from(subs.current)) cb();
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
   const components = useMemo(
     () =>
       buildComponents({
@@ -234,18 +303,29 @@ export function MarkdownPreview({
   // happen as soon as the user clicks the textarea.
   const showPopover = editorView !== undefined;
 
+  const markdownContent = (
+    <Markdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={rehypePlugins}
+      components={components}
+    >
+      {processedSource}
+    </Markdown>
+  );
+
   return (
     <div
       className={`md-preview${showMargin ? " md-preview--with-margin" : ""}`}
       ref={containerRef}
     >
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={rehypePlugins}
-        components={components}
-      >
-        {processedSource}
-      </Markdown>
+      {renderOverlay ? (
+        <div ref={contentRef} className="md-preview-content">
+          {markdownContent}
+          {renderOverlay(transform)}
+        </div>
+      ) : (
+        markdownContent
+      )}
       {showMargin && (
         <CommentMargin
           containerRef={containerRef}
