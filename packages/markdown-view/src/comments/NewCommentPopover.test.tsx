@@ -20,7 +20,13 @@ describe("NewCommentPopover", () => {
     const { container } = render(
       <NewCommentPopover
         editorView={view}
-        selection={{ sourceStart: 0, sourceEnd: 5, text: "hello" }}
+        selection={{
+          sourceStart: 0,
+          sourceEnd: 5,
+          text: "hello",
+          anchorTop: 0,
+          anchorLeft: 0,
+        }}
         currentAuthor="alice"
         onClose={() => undefined}
       />,
@@ -33,7 +39,13 @@ describe("NewCommentPopover", () => {
     const { container, getByText } = render(
       <NewCommentPopover
         editorView={view}
-        selection={{ sourceStart: 0, sourceEnd: 5, text: "hello" }}
+        selection={{
+          sourceStart: 0,
+          sourceEnd: 5,
+          text: "hello",
+          anchorTop: 0,
+          anchorLeft: 0,
+        }}
         currentAuthor="alice"
         onClose={() => undefined}
       />,
@@ -48,7 +60,13 @@ describe("NewCommentPopover", () => {
     const { container, getByText } = render(
       <NewCommentPopover
         editorView={view}
-        selection={{ sourceStart: 0, sourceEnd: 5, text: "hello" }}
+        selection={{
+          sourceStart: 0,
+          sourceEnd: 5,
+          text: "hello",
+          anchorTop: 0,
+          anchorLeft: 0,
+        }}
         currentAuthor="alice"
         onClose={() => {
           closed += 1;
@@ -70,7 +88,13 @@ describe("NewCommentPopover", () => {
     const { getByText } = render(
       <NewCommentPopover
         editorView={view}
-        selection={{ sourceStart: 0, sourceEnd: 5, text: "hello" }}
+        selection={{
+          sourceStart: 0,
+          sourceEnd: 5,
+          text: "hello",
+          anchorTop: 0,
+          anchorLeft: 0,
+        }}
         currentAuthor="alice"
         onClose={() => {
           closed += 1;
@@ -87,7 +111,13 @@ describe("NewCommentPopover", () => {
     const { getByText, container } = render(
       <NewCommentPopover
         editorView={view}
-        selection={{ sourceStart: 0, sourceEnd: 5, text: "hello" }}
+        selection={{
+          sourceStart: 0,
+          sourceEnd: 5,
+          text: "hello",
+          anchorTop: 0,
+          anchorLeft: 0,
+        }}
         currentAuthor="alice"
         onClose={() => undefined}
       />,
@@ -119,6 +149,8 @@ describe("NewCommentPopover", () => {
       sourceStart: 0,
       sourceEnd: 5,
       text: "hello",
+      anchorTop: 0,
+      anchorLeft: 0,
     };
     const { container, getByText, rerender } = render(
       <NewCommentPopover
@@ -152,7 +184,13 @@ describe("NewCommentPopover", () => {
     const { container, getByText } = render(
       <NewCommentPopover
         editorView={view}
-        selection={{ sourceStart: 0, sourceEnd: 5, text: "hello" }}
+        selection={{
+          sourceStart: 0,
+          sourceEnd: 5,
+          text: "hello",
+          anchorTop: 0,
+          anchorLeft: 0,
+        }}
         currentAuthor="alice"
         onClose={() => undefined}
       />,

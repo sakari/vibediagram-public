@@ -23,6 +23,12 @@ export type SelectionRange = {
   readonly sourceStart: number;
   readonly sourceEnd: number;
   readonly text: string;
+  // Anchor point for positioning a UI affordance next to the selection. The
+  // coordinates are relative to the preview container's scroll-content origin
+  // (so they stay valid as the preview scrolls). `top` is the bottom of the
+  // selection's last line; `left` is the selection's start x.
+  readonly anchorTop: number;
+  readonly anchorLeft: number;
 };
 
 const findAnnotatedAncestor = (node: Node | null): HTMLElement | null => {
@@ -110,6 +116,24 @@ const isInsideCommentAnchor = (node: Node): boolean => {
   return el.closest("mark.vd-comment-anchor") !== null;
 };
 
+const computeAnchor = (
+  range: Range,
+  root: HTMLElement,
+): { anchorTop: number; anchorLeft: number } => {
+  // jsdom does not implement Range.getBoundingClientRect; guard so unit tests
+  // that exercise the resolver against synthetic DOMs keep working. In real
+  // browsers the method always exists.
+  if (typeof range.getBoundingClientRect !== "function") {
+    return { anchorTop: 0, anchorLeft: 0 };
+  }
+  const rangeRect = range.getBoundingClientRect();
+  const rootRect = root.getBoundingClientRect();
+  return {
+    anchorTop: rangeRect.bottom - rootRect.top + root.scrollTop,
+    anchorLeft: rangeRect.left - rootRect.left + root.scrollLeft,
+  };
+};
+
 /** @public */
 export const resolveSelection = (
   range: Range,
@@ -156,10 +180,13 @@ export const resolveSelection = (
   if (startOffset === null || endOffset === null) return null;
   if (startOffset === endOffset) return null;
   const text = range.toString();
+  const { anchorTop, anchorLeft } = computeAnchor(range, root);
   return {
     sourceStart: blockStart + startOffset,
     sourceEnd: blockStart + endOffset,
     text,
+    anchorTop,
+    anchorLeft,
   };
 };
 

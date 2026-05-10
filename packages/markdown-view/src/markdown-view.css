@@ -6,6 +6,7 @@
   color: #d4d4d4;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.6;
+  position: relative;
 }
 
 /* Inner wrapper used only when a drawing overlay is mounted; provides
@@ -80,7 +81,6 @@
 
 .md-preview--with-margin {
   position: relative;
-  padding-right: 280px;
 }
 
 .vd-comment-anchor {
@@ -213,9 +213,17 @@
 .vd-new-comment-trigger,
 .vd-new-comment-popover {
   position: absolute;
-  top: 8px;
-  right: 8px;
   z-index: 10;
+}
+
+.vd-new-comment-trigger {
+  background: #2a2a2a;
+  color: #d4d4d4;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
 }
 
 /*

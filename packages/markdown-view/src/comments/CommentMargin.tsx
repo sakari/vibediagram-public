@@ -26,10 +26,11 @@ const measure = (
   markers: readonly ThreadMarker[],
 ): Position[] => {
   const containerRect = container.getBoundingClientRect();
+  const scrollTop = container.scrollTop;
   const positions: Position[] = [];
   for (const m of markers) {
     const r = m.anchorEl.getBoundingClientRect();
-    positions.push({ id: m.id, top: r.top - containerRect.top });
+    positions.push({ id: m.id, top: r.top - containerRect.top + scrollTop });
   }
   // Stack overlapping bubbles by enforcing a minimum gap.
   const MIN_GAP = 28;

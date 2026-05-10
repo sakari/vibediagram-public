@@ -52,6 +52,10 @@ export function NewCommentPopover({
       <button
         type="button"
         className="vd-new-comment-trigger"
+        style={{
+          top: liveSelection.anchorTop + 4,
+          left: liveSelection.anchorLeft,
+        }}
         // Suppress the default mousedown so the click does not tear down the
         // text selection before our React handler captures it.
         onMouseDown={(e) => {
@@ -66,7 +70,14 @@ export function NewCommentPopover({
     );
   }
   return (
-    <form className="vd-new-comment-popover" onSubmit={handleSubmit}>
+    <form
+      className="vd-new-comment-popover"
+      style={{
+        top: snapshot.anchorTop + 4,
+        left: snapshot.anchorLeft,
+      }}
+      onSubmit={handleSubmit}
+    >
       <textarea
         className="vd-new-comment-input"
         autoFocus
