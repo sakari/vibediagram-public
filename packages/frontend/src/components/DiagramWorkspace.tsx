@@ -23,6 +23,8 @@ import { useDiagramDocument, createAnnotations } from "../hooks/useJazzDB";
 import { VibeDiagramAccount } from "../jazz/schema";
 import { JazzProjectStore } from "../stores/JazzProjectStore";
 import SimControls from "./SimControls";
+import SimulationToolbar from "./SimulationToolbar";
+import { CollapsiblePane } from "./CollapsiblePane";
 import MetricNode from "./MetricNode";
 import { MarkdownPreview } from "@diagram/markdown-view";
 import { DrawOverlay } from "@diagram/draw-overlay";
@@ -98,6 +100,7 @@ const DiagramWorkspace: React.FC = () => {
   const [activeFile, setActiveFile] = useState<string | null>("/main.ts");
   const [fileTreeCollapsed, setFileTreeCollapsed] = useState(false);
   const [editorCollapsed, setEditorCollapsed] = useState(false);
+  const [rightPaneCollapsed, setRightPaneCollapsed] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [timeWindow, setTimeWindow] = useState<number | null>(null);
   const [forking, setForking] = useState(false);
@@ -534,68 +537,24 @@ const DiagramWorkspace: React.FC = () => {
     );
   }
 
-  let collapseLabel: string;
-  let collapseIcon: string;
-  let splitClass: string;
-  let leftPaneClass: string;
-  if (editorCollapsed) {
-    collapseLabel = "Expand editor";
-    collapseIcon = "\u25b6";
-    splitClass = "split-container editor-collapsed";
-    leftPaneClass = "left-pane collapsed";
-  } else {
-    collapseLabel = "Collapse editor";
-    collapseIcon = "\u25c0";
-    splitClass = "split-container";
-    leftPaneClass = "left-pane";
-  }
-
   const leadingControls = (
-    <>
-      <button
-        type="button"
-        className="sim-btn sim-btn-back"
-        onClick={() => {
-          navigate("/projects");
-        }}
-        title="Back to all projects"
-      >
-        {"← All projects"}
-      </button>
-      <button
-        type="button"
-        className="editor-collapse-toggle"
-        onClick={() => {
-          setEditorCollapsed((prev) => !prev);
-        }}
-        aria-label={collapseLabel}
-        title={collapseLabel}
-      >
-        {collapseIcon}
-      </button>
-    </>
+    <button
+      type="button"
+      className="sim-btn sim-btn-back"
+      onClick={() => {
+        navigate("/projects");
+      }}
+      title="Back to all projects"
+    >
+      {"← All projects"}
+    </button>
   );
+
+  const showDiagram = markdownSource === null && enrichedSpec !== null;
 
   return (
     <div className="workspace-container">
       <SimControls
-        status={sim.status}
-        simTime={sim.snapshot?.simTime ?? null}
-        error={sim.error}
-        speed={speed}
-        timeWindow={timeWindow}
-        onRun={() => {
-          void handleRun();
-        }}
-        onPause={sim.pause}
-        onResume={sim.start}
-        onStep={sim.step}
-        onReset={handleReset}
-        onSetSpeed={(v) => {
-          setSpeed(v);
-          sim.setSpeed(v);
-        }}
-        onSetTimeWindow={setTimeWindow}
         leading={leadingControls}
         projectTitle={document.title}
         onTitleChange={
@@ -662,54 +621,88 @@ const DiagramWorkspace: React.FC = () => {
           </button>
         </div>
       )}
-      <div className={splitClass}>
-        <div
-          className={leftPaneClass}
-          aria-hidden={editorCollapsed || undefined}
+      <div className="split-container">
+        <CollapsiblePane
+          className="files-pane"
+          collapsed={fileTreeCollapsed}
+          onToggle={() => {
+            setFileTreeCollapsed((prev) => !prev);
+          }}
+          toggleSide="left"
+          collapseLabel="Collapse file tree"
+          expandLabel="Expand file tree"
+          expandedIcon="◀"
+          collapsedIcon="▶"
         >
-          <div className="editor-with-tree">
-            <div
-              className={`file-tree-sidebar${fileTreeCollapsed ? " collapsed" : ""}`}
-            >
-              <button
-                type="button"
-                className="file-tree-toggle"
-                onClick={() => {
-                  setFileTreeCollapsed((prev) => !prev);
-                }}
-                aria-label={
-                  fileTreeCollapsed ? "Expand file tree" : "Collapse file tree"
-                }
-              >
-                {fileTreeCollapsed ? "\u25b6" : "\u25c0"}
-              </button>
-              {!fileTreeCollapsed && (
-                <FileTreePanel
-                  fileStore={fileStore}
-                  onSelect={handleFileSelect}
-                  activeFile={activeFile}
-                  theme="dark"
-                  readOnlyFiles={readOnlyTreeFiles}
-                  readOnly={isReadOnly}
-                />
-              )}
-            </div>
-            <EditorComponent
-              ref={editorRef}
-              fileStore={fileStore}
-              initialFile="/main.ts"
-              tsConfig={TS_CONFIG}
-              extraLibs={SIM_MODEL_EXTRA_LIBS}
-              theme="dark"
-              className="editor-pane"
-              onActiveTabChange={handleActiveTabChange}
-              onContentChange={isReadOnly ? undefined : handleContentChange}
-              onNavigate={handleNavigate}
-              readOnly={isReadOnly}
+          <FileTreePanel
+            fileStore={fileStore}
+            onSelect={handleFileSelect}
+            activeFile={activeFile}
+            theme="dark"
+            readOnlyFiles={readOnlyTreeFiles}
+            readOnly={isReadOnly}
+          />
+        </CollapsiblePane>
+        <CollapsiblePane
+          className="editor-pane-col"
+          collapsed={editorCollapsed}
+          onToggle={() => {
+            setEditorCollapsed((prev) => !prev);
+          }}
+          toggleSide="right"
+          collapseLabel="Collapse editor"
+          expandLabel="Expand editor"
+          expandedIcon="◀"
+          collapsedIcon="▶"
+        >
+          <EditorComponent
+            ref={editorRef}
+            fileStore={fileStore}
+            initialFile="/main.ts"
+            tsConfig={TS_CONFIG}
+            extraLibs={SIM_MODEL_EXTRA_LIBS}
+            theme="dark"
+            className="editor-pane"
+            onActiveTabChange={handleActiveTabChange}
+            onContentChange={isReadOnly ? undefined : handleContentChange}
+            onNavigate={handleNavigate}
+            readOnly={isReadOnly}
+          />
+        </CollapsiblePane>
+        <div className="split-spacer" aria-hidden="true" />
+        <CollapsiblePane
+          className="right-pane"
+          collapsed={rightPaneCollapsed}
+          onToggle={() => {
+            setRightPaneCollapsed((prev) => !prev);
+          }}
+          toggleSide="right"
+          collapseLabel="Collapse preview"
+          expandLabel="Expand preview"
+          expandedIcon="▶"
+          collapsedIcon="◀"
+        >
+          {showDiagram && (
+            <SimulationToolbar
+              status={sim.status}
+              simTime={sim.snapshot?.simTime ?? null}
+              error={sim.error}
+              speed={speed}
+              timeWindow={timeWindow}
+              onRun={() => {
+                void handleRun();
+              }}
+              onPause={sim.pause}
+              onResume={sim.start}
+              onStep={sim.step}
+              onReset={handleReset}
+              onSetSpeed={(v) => {
+                setSpeed(v);
+                sim.setSpeed(v);
+              }}
+              onSetTimeWindow={setTimeWindow}
             />
-          </div>
-        </div>
-        <div className="right-pane">
+          )}
           {annotationsBackend && (
             <DrawingToolbar
               canWrite={canWrite}
@@ -777,7 +770,7 @@ const DiagramWorkspace: React.FC = () => {
               <p>Write simulation code to see the diagram</p>
             </div>
           )}
-        </div>
+        </CollapsiblePane>
       </div>
     </div>
   );

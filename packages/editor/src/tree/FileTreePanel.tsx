@@ -245,6 +245,7 @@ export function FileTreePanel({
       }}
     >
       <div
+        className="file-tree-header"
         style={{
           display: "flex",
           alignItems: "center",

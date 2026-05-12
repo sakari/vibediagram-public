@@ -28,6 +28,7 @@ function basename(path: string): string {
 export function TabBar({ tabs, activeTab, onSelect, onClose }: TabBarProps) {
   return (
     <div
+      className="editor-tab-bar"
       style={{
         display: "flex",
         flexDirection: "row",

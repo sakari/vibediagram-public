@@ -20,109 +20,160 @@
   overflow: hidden;
 }
 
-/* Split container using CSS Grid */
+/* Split container: [files] [editor] [preview] — flex so each pane's width
+ * animates smoothly when collapsed/expanded. */
 .split-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr; /* 50/50 split */
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  transition: grid-template-columns 0.15s ease;
-}
-
-.split-container.editor-collapsed {
-  grid-template-columns: 0fr 1fr;
-}
-
-.left-pane,
-.right-pane {
-  overflow: hidden;
-  position: relative;
-}
-
-.left-pane {
-  border-right: 1px solid #333;
   display: flex;
-  flex-direction: column;
-}
-
-.left-pane.collapsed {
-  border-right: none;
-}
-
-/* Editor collapse/expand toggle button inside SimControls */
-.editor-collapse-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 100%;
-  padding: 0;
-  border: none;
-  border-right: 1px solid #444;
-  border-radius: 0;
-  background: transparent;
-  color: #858585;
-  font-size: 10px;
-  cursor: pointer;
-  flex-shrink: 0;
-  margin-right: 4px;
-}
-
-.editor-collapse-toggle:hover {
-  color: #fff;
-  background: #2d2d2d;
-}
-
-/* Horizontal wrapper for file tree + editor within .left-pane */
-.editor-with-tree {
-  display: flex;
-  flex-direction: row;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-/* Collapsible file tree sidebar */
-.file-tree-sidebar {
+.files-pane {
   width: 200px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid #333;
-  background: #1e1e1e;
-  overflow-y: auto;
   flex-shrink: 0;
   transition: width 0.15s ease;
 }
 
-.file-tree-sidebar.collapsed {
+.files-pane.collapsed {
   width: 28px;
-  overflow: hidden;
 }
 
-/* Toggle button for collapsing/expanding the file tree */
-.file-tree-toggle {
+.editor-pane-col,
+.right-pane {
+  flex: 1 1 0;
+  min-width: 0;
+  transition: flex 0.15s ease;
+}
+
+.editor-pane-col.collapsed,
+.right-pane.collapsed {
+  flex: 0 0 28px;
+}
+
+/* Keep the children mounted so component state (editor tabs, scroll, etc.)
+ * survives a collapse/expand round-trip; just remove them from the
+ * collapsed rail's layout. */
+.collapsible-pane-content {
+  display: contents;
+}
+
+.files-pane.collapsed > .collapsible-pane-content,
+.editor-pane-col.collapsed > .collapsible-pane-content,
+.right-pane.collapsed > .collapsible-pane-content {
+  display: none;
+}
+
+/* Animatable spacer between the editor column and the right pane. Zero
+ * width by default. Expands to absorb slack ONLY when both the editor
+ * and the right pane are collapsed — that's the case flex packing would
+ * otherwise leave the right rail floating in the middle. When only the
+ * right pane is collapsed, the editor (flex: 1 1 0) naturally absorbs
+ * the slack and grows to full width. */
+.split-spacer {
+  flex: 0 0 0;
+  min-width: 0;
+  transition: flex 0.15s ease;
+}
+
+.split-container:has(.editor-pane-col.collapsed):has(.right-pane.collapsed)
+  .split-spacer {
+  flex: 1 1 0;
+}
+
+.files-pane,
+.editor-pane-col,
+.right-pane {
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.files-pane {
+  background: #1e1e1e;
+  border-right: 1px solid #333;
+}
+
+.files-pane:not(.collapsed) {
+  overflow-y: auto;
+}
+
+.editor-pane-col {
+  border-right: 1px solid #333;
+}
+
+.right-pane.collapsed {
+  border-left: 1px solid #333;
+  background: #1e1e1e;
+}
+
+/* Unify the visual height of each pane's top bar so the chevrons and
+ * content boundaries align horizontally across all three panes. */
+.file-tree-header,
+.editor-tab-bar,
+.right-pane .drawing-toolbar {
+  height: 32px !important;
+  min-height: 32px !important;
+  box-sizing: border-box !important;
+  align-items: center !important;
+}
+
+/* Make room at the trailing edge of the DrawingToolbar so the right-pane's
+ * top-right chevron doesn't cover the Clear button. */
+.right-pane:not(.collapsed) .drawing-toolbar {
+  padding-right: 32px;
+}
+
+/* Make room at the trailing edge of the editor's TabBar so the top-right
+ * chevron doesn't cover the rightmost tab. */
+.editor-pane-col:not(.collapsed) .editor-tab-bar {
+  padding-right: 28px;
+}
+
+/* Edge-mounted collapse/expand chevron. Always visible — including when the
+ * pane is reduced to a 28px rail. */
+.pane-edge-toggle {
+  position: absolute;
+  top: 6px;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 24px;
+  width: 18px;
+  height: 22px;
   padding: 0;
-  border: none;
-  border-bottom: 1px solid #333;
-  border-radius: 0;
-  background: #252526;
-  color: #858585;
+  border: 1px solid #444;
+  border-radius: 3px;
+  background: #2d2d2d;
+  color: #ccc;
   font-size: 10px;
   cursor: pointer;
-  flex-shrink: 0;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
-.file-tree-toggle:hover {
+.pane-edge-toggle:hover {
+  background: #3a3a3a;
   color: #fff;
-  background: #2d2d2d;
-  border-color: transparent;
+  border-color: #666;
+}
+
+.pane-edge-toggle-right {
+  right: 4px;
+}
+
+.pane-edge-toggle-left {
+  left: 4px;
+}
+
+.files-pane.collapsed .pane-edge-toggle,
+.editor-pane-col.collapsed .pane-edge-toggle,
+.right-pane.collapsed .pane-edge-toggle {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
 }
 
 /* Editor pane styles */
@@ -444,11 +495,44 @@
   cursor: default;
 }
 
-.sim-controls-status {
+.simulation-toolbar {
+  position: absolute;
+  top: 44px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 8px;
+  background: rgba(20, 20, 20, 0.88);
+  border: 1px solid #333;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  pointer-events: auto;
+  max-width: calc(100% - 24px);
+}
+
+.simulation-toolbar-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.simulation-toolbar-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: 11px;
+  padding-top: 2px;
+  border-top: 1px solid #333;
+}
+
+.simulation-toolbar .sim-dropdown-group {
+  margin-left: 4px;
+  padding-left: 6px;
 }
 
 .sim-status {

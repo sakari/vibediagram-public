@@ -2,7 +2,7 @@ import { render, fireEvent } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { SimStatus } from "@diagram/sim-worker";
-import SimControls from "./SimControls";
+import SimulationToolbar from "./SimulationToolbar";
 
 function defaultProps() {
   return {
@@ -21,11 +21,11 @@ function defaultProps() {
   };
 }
 
-describe("SimControls", () => {
+describe("SimulationToolbar", () => {
   it("renders speed dropdown with current value selected", () => {
     const props = defaultProps();
     props.speed = 2;
-    const { container } = render(<SimControls {...props} />);
+    const { container } = render(<SimulationToolbar {...props} />);
 
     const speedSelect =
       container.querySelectorAll<HTMLSelectElement>("select")[0];
@@ -34,7 +34,7 @@ describe("SimControls", () => {
 
   it("calls onSetSpeed when speed dropdown changes", () => {
     const props = defaultProps();
-    const { container } = render(<SimControls {...props} />);
+    const { container } = render(<SimulationToolbar {...props} />);
 
     const speedSelect =
       container.querySelectorAll<HTMLSelectElement>("select")[0];
@@ -45,7 +45,7 @@ describe("SimControls", () => {
   it("renders time window dropdown with current value selected", () => {
     const props = defaultProps();
     props.timeWindow = 60;
-    const { container } = render(<SimControls {...props} />);
+    const { container } = render(<SimulationToolbar {...props} />);
 
     const windowSelect =
       container.querySelectorAll<HTMLSelectElement>("select")[1];
@@ -54,7 +54,7 @@ describe("SimControls", () => {
 
   it("calls onSetTimeWindow with number when a time option is selected", () => {
     const props = defaultProps();
-    const { container } = render(<SimControls {...props} />);
+    const { container } = render(<SimulationToolbar {...props} />);
 
     const windowSelect =
       container.querySelectorAll<HTMLSelectElement>("select")[1];
@@ -65,7 +65,7 @@ describe("SimControls", () => {
   it("calls onSetTimeWindow with null when All is selected", () => {
     const props = defaultProps();
     props.timeWindow = 30;
-    const { container } = render(<SimControls {...props} />);
+    const { container } = render(<SimulationToolbar {...props} />);
 
     const windowSelect =
       container.querySelectorAll<HTMLSelectElement>("select")[1];
@@ -76,7 +76,7 @@ describe("SimControls", () => {
   it("speed dropdown is enabled when simulation is idle", () => {
     const props = defaultProps();
     props.status = "idle";
-    const { container } = render(<SimControls {...props} />);
+    const { container } = render(<SimulationToolbar {...props} />);
 
     const speedSelect =
       container.querySelectorAll<HTMLSelectElement>("select")[0];
