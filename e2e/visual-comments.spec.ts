@@ -18,7 +18,7 @@ async function seedAndCreateProject(page: Page): Promise<void> {
     localStorage.setItem("vibediagram-jazz-api-key", "e2e-test-key");
   });
   await page.goto("/projects");
-  await page.locator(".project-card", { hasText: "+ New Project" }).click();
+  await page.locator(".new-project-btn").click();
   await expect(page.locator(".cm-editor")).toBeVisible({ timeout: 20_000 });
 }
 
@@ -29,8 +29,9 @@ async function createMarkdownFile(page: Page, content: string): Promise<void> {
   await nameInput.fill("notes.md");
   await page.keyboard.press("Enter");
 
-  // Open the new file. The file tree opens it on click; the editor focuses
-  // the empty document.
+  // Pressing Enter creates the file but leaves the currently-open simulation
+  // tab focused. Click the new file in the file tree to open it.
+  await page.getByText("notes.md", { exact: true }).first().click();
   await page.locator(".cm-editor").click();
   await page.keyboard.press("Control+A");
   await page.keyboard.press("Delete");
@@ -43,9 +44,11 @@ async function createMarkdownFile(page: Page, content: string): Promise<void> {
   }, content);
   await page.keyboard.press("Control+V");
 
-  // Wait for editor → FileStore debounce (300ms) → preview render.
+  // Wait for editor → FileStore debounce (300ms) → preview render. The
+  // CriticMarkup transformer hides the {>>...} metadata from the preview, so
+  // we wait for a rendered comment anchor element instead of the raw text.
   await expect(page.locator(".md-preview")).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator(".md-preview")).toContainText("@", {
+  await expect(page.locator(".vd-comment-bubble").first()).toBeVisible({
     timeout: 10_000,
   });
   // Allow margin layout (mounts after first paint to read DOM rects) to
@@ -67,7 +70,7 @@ test.describe("Visual Regression – Markdown Comments", () => {
       [
         "# Notes",
         "",
-        "The cache is read-through {==and write-back==}{>>id:c1 by:@alice 2026-05-09T10:00:00Z: looks fine<<}.",
+        "The cache is read-through {==and write-back==}{>>id:c1 | by:@alice 2026-05-09T10:00:00Z: looks fine<<}.",
         "",
       ].join("\n"),
     );

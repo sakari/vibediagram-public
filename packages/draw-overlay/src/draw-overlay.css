@@ -72,7 +72,7 @@
   /* paint-order + thick semi-transparent stroke gives a readable halo on
      both light and dark backgrounds without needing a background rect. */
   paint-order: stroke;
-  stroke: rgba(0, 0, 0, 0.7);
+  stroke: var(--shadow-strong);
   stroke-width: 3px;
   stroke-linecap: round;
   stroke-linejoin: round;

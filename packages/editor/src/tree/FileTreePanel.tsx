@@ -237,7 +237,7 @@ export function FileTreePanel({
     <div
       {...containerProps}
       style={{
-        padding: "8px 0",
+        padding: "0 0 8px",
         backgroundColor: styles.bg,
         color: styles.text,
         fontFamily: "system-ui, sans-serif",

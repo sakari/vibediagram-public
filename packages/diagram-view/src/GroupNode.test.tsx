@@ -109,7 +109,9 @@ describe("GroupNode", () => {
       const gc = container.querySelector<HTMLElement>(
         "[data-testid='group-container']",
       )!;
-      expect(gc.style.background).toBe("rgba(30, 30, 46, 0.5)");
+      expect(gc.style.background).toBe(
+        "var(--group-bg, rgba(30, 30, 46, 0.5))",
+      );
     });
 
     it("[gn-borderwidth] applies borderWidth from nodeStyle", () => {
@@ -160,7 +162,9 @@ describe("GroupNode", () => {
       const gc = container.querySelector<HTMLElement>(
         "[data-testid='group-container']",
       )!;
-      expect(gc.style.background).toBe("rgba(30, 30, 46, 0.5)");
+      expect(gc.style.background).toBe(
+        "var(--group-bg, rgba(30, 30, 46, 0.5))",
+      );
     });
   });
 });

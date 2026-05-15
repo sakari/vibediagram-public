@@ -2,8 +2,8 @@
   overflow: auto;
   height: 100%;
   padding: 24px 32px;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--bg-app);
+  color: var(--text-default);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.6;
   position: relative;
@@ -21,20 +21,20 @@
 .md-preview h1,
 .md-preview h2,
 .md-preview h3 {
-  color: #fff;
-  border-bottom: 1px solid #333;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-default);
   padding-bottom: 4px;
 }
 
 .md-preview pre {
-  background: #0d0d0d;
+  background: var(--bg-code);
   padding: 12px;
   border-radius: 4px;
   overflow: auto;
 }
 
 .md-preview code {
-  background: #2a2a2a;
+  background: var(--bg-elevated);
   padding: 2px 4px;
   border-radius: 3px;
   font-family: "SF Mono", Menlo, Consolas, monospace;
@@ -52,7 +52,7 @@
 
 .md-preview th,
 .md-preview td {
-  border: 1px solid #333;
+  border: 1px solid var(--border-default);
   padding: 4px 8px;
 }
 
@@ -111,13 +111,13 @@
   position: absolute;
   right: 0;
   width: 100%;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  color: #d4d4d4;
+  color: var(--text-default);
   font-size: 12px;
   pointer-events: auto;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 6px var(--shadow-soft);
 }
 
 .vd-comment-bubble--resolved {
@@ -149,13 +149,13 @@
   display: flex;
   justify-content: space-between;
   font-size: 11px;
-  color: #888;
+  color: var(--text-faint);
   margin-bottom: 4px;
 }
 
 .vd-comment-bubble-close {
   background: transparent;
-  color: #aaa;
+  color: var(--text-subdued);
   border: none;
   cursor: pointer;
 }
@@ -170,7 +170,7 @@
 
 .vd-comment-message {
   padding: 4px 0;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .vd-comment-message:last-child {
@@ -185,7 +185,7 @@
 
 .vd-comment-message-ts {
   font-size: 10px;
-  color: #777;
+  color: var(--text-fainter);
 }
 
 .vd-comment-message-text {
@@ -195,9 +195,9 @@
 
 .vd-comment-bubble-input {
   width: 100%;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  border: 1px solid #444;
+  background: var(--bg-app);
+  color: var(--text-default);
+  border: 1px solid var(--border-medium);
   border-radius: 3px;
   padding: 4px;
   font-size: 12px;
@@ -217,9 +217,9 @@
 }
 
 .vd-new-comment-trigger {
-  background: #2a2a2a;
-  color: #d4d4d4;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-elevated);
+  color: var(--text-default);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 11px;
@@ -245,9 +245,9 @@
   top: 6px;
   right: 6px;
   z-index: 5;
-  background: #2a2a2a;
-  color: #d4d4d4;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-elevated);
+  color: var(--text-default);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 11px;
@@ -267,8 +267,8 @@
   top: 6px;
   right: 6px;
   z-index: 6;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   padding: 6px;
   width: 240px;
@@ -276,9 +276,9 @@
 
 .vd-block-trigger-input {
   width: 100%;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  border: 1px solid #444;
+  background: var(--bg-app);
+  color: var(--text-default);
+  border: 1px solid var(--border-medium);
   border-radius: 3px;
   padding: 4px;
   box-sizing: border-box;
@@ -291,8 +291,8 @@
 }
 
 .vd-new-comment-popover {
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   padding: 6px;
   width: 240px;
@@ -300,9 +300,9 @@
 
 .vd-new-comment-input {
   width: 100%;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  border: 1px solid #444;
+  background: var(--bg-app);
+  color: var(--text-default);
+  border: 1px solid var(--border-medium);
   border-radius: 3px;
   padding: 4px;
   box-sizing: border-box;

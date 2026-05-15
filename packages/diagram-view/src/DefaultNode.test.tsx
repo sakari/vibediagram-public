@@ -91,7 +91,7 @@ describe("DefaultNode", () => {
     it("[dn-no-style] renders without nodeStyle", () => {
       const { container } = renderNode({ data: { label: "Plain" } });
       const box = container.querySelector("div")!;
-      expect(box.style.background).toContain("30, 30, 46");
+      expect(box.style.background).toContain("--node-bg");
     });
 
     it("[dn-borderwidth] applies borderWidth from nodeStyle", () => {
@@ -121,7 +121,7 @@ describe("DefaultNode", () => {
         data: { label: "X", nodeStyle: "not-an-object" },
       });
       const box = container.querySelector("div")!;
-      expect(box.style.background).toContain("30, 30, 46");
+      expect(box.style.background).toContain("--node-bg");
     });
   });
 

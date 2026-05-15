@@ -63,9 +63,9 @@ function buildNodeCss(
   const css: React.CSSProperties = {
     padding: "8px 16px",
     borderRadius: shape === "rounded-rectangle" ? 16 : 4,
-    border: "1px solid #4a4a6a",
-    background: "#1e1e2e",
-    color: "#e0e0e0",
+    border: "1px solid var(--node-border, #4a4a6a)",
+    background: "var(--node-bg, #1e1e2e)",
+    color: "var(--node-text, #e0e0e0)",
     fontSize: 13,
     minWidth: 80,
     textAlign: "center" as const,
@@ -94,8 +94,8 @@ function ShapeOverlay({
 }) {
   return renderShape(
     shape,
-    cssStyleProps.background ?? "#1e1e2e",
-    cssStyleProps.borderColor ?? "#4a4a6a",
+    cssStyleProps.background ?? "var(--node-bg, #1e1e2e)",
+    cssStyleProps.borderColor ?? "var(--node-border, #4a4a6a)",
     typeof cssStyleProps.borderWidth === "number"
       ? cssStyleProps.borderWidth
       : 1,

@@ -90,6 +90,7 @@ function DiagramInner({
   layoutOptions,
   className,
   renderOverlay,
+  colorMode,
 }: DiagramRendererProps) {
   const [measuredSizes, setMeasuredSizes] = useState<NodeSizeMap | undefined>();
   const { nodes, edges, layoutReady } = useAutoLayout(
@@ -328,6 +329,7 @@ function DiagramInner({
         onNodeDragStop={handleNodeDragStop}
         fitView
         className={className}
+        colorMode={colorMode}
         proOptions={{ hideAttribution: true }}
       >
         <Background />

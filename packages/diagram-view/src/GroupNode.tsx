@@ -18,8 +18,8 @@ export function GroupNode({ data, width, height }: NodeProps) {
     width: width ?? "100%",
     height: height ?? "100%",
     borderRadius: 6,
-    border: "1px solid #5a5a7a",
-    background: "rgba(30, 30, 46, 0.5)",
+    border: "1px solid var(--group-border, #5a5a7a)",
+    background: "var(--group-bg, rgba(30, 30, 46, 0.5))",
     position: "relative",
     ...nodeStyle,
   };
@@ -36,9 +36,9 @@ export function GroupNode({ data, width, height }: NodeProps) {
           padding: "4px 10px",
           fontSize: 12,
           fontWeight: 600,
-          color: "#b0b0c0",
-          borderBottom: "1px solid #5a5a7a",
-          background: "rgba(40, 40, 56, 0.7)",
+          color: "var(--group-header-text, #b0b0c0)",
+          borderBottom: "1px solid var(--group-border, #5a5a7a)",
+          background: "var(--group-header-bg, rgba(40, 40, 56, 0.7))",
           borderTopLeftRadius: 6,
           borderTopRightRadius: 6,
         }}

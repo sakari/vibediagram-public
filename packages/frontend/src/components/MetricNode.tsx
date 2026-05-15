@@ -71,11 +71,11 @@ function MetricNode({ data }: DiagramNodeComponentProps) {
         padding: "2px 8px",
         fontSize: 12,
         fontFamily: "system-ui, sans-serif",
-        color: "#b0b0c0",
+        color: "var(--node-text, #b0b0c0)",
         overflow: "hidden",
         minWidth: 220,
         minHeight: 100,
-        background: "#141420",
+        background: "var(--metric-node-bg, #141420)",
         borderRadius: 4,
       }}
     >

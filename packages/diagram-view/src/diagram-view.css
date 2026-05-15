@@ -32,8 +32,26 @@
 }
 
 .diagram-label-hint:hover {
-  color: #ffffff;
+  color: var(--text-primary);
   text-decoration-color: #9090b0;
+}
+
+/* React Flow's built-in light-mode controls (the +/-/fit/lock buttons in
+   the diagram pane's bottom-left) blend into a near-white app body —
+   the default button bg is #fefefe over body #ffffff. Pin background +
+   text + border to higher-contrast values so the controls read clearly. */
+.react-flow__controls-button {
+  background: #ffffff;
+  border-color: var(--border-input, #c8c8c8);
+  color: var(--text-strong, #1a1a1a);
+}
+.react-flow__controls-button:hover {
+  background: var(--bg-elevated, #f0f0f0);
+}
+/* Drop React Flow's default container shadow — the per-button borders
+   already group the controls visually. */
+.react-flow__controls {
+  box-shadow: none;
 }
 
 /* Host for an optional overlay rendered via DiagramRenderer's

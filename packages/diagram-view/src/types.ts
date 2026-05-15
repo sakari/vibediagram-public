@@ -127,4 +127,8 @@ export interface DiagramRendererProps {
   readonly layoutOptions?: LayoutOptions;
   readonly className?: string;
   readonly renderOverlay?: (transform: CoordTransform) => React.ReactNode;
+  /** React Flow color mode. Controls the dotted-background and built-in
+   * control colors. Node component colors come from CSS variables on
+   * `:root`. Defaults to "dark" for backwards compatibility. */
+  readonly colorMode?: "dark" | "light" | "system";
 }

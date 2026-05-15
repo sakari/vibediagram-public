@@ -638,7 +638,7 @@ const DiagramWorkspace: React.FC = () => {
             fileStore={fileStore}
             onSelect={handleFileSelect}
             activeFile={activeFile}
-            theme="dark"
+            theme="light"
             readOnlyFiles={readOnlyTreeFiles}
             readOnly={isReadOnly}
           />
@@ -661,7 +661,7 @@ const DiagramWorkspace: React.FC = () => {
             initialFile="/main.ts"
             tsConfig={TS_CONFIG}
             extraLibs={SIM_MODEL_EXTRA_LIBS}
-            theme="dark"
+            theme="light"
             className="editor-pane"
             onActiveTabChange={handleActiveTabChange}
             onContentChange={isReadOnly ? undefined : handleContentChange}
@@ -743,6 +743,7 @@ const DiagramWorkspace: React.FC = () => {
               spec={enrichedSpec}
               nodeTypes={NODE_TYPES}
               className="diagram-pane"
+              colorMode="light"
               renderOverlay={
                 annotationsBackend
                   ? (transform) => (
