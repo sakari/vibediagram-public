@@ -46,6 +46,12 @@ export interface EditorProps {
   onContentChange?: () => void;
   /** Callback invoked when go-to-definition targets a different file. */
   onNavigate?: (targetPath: string, targetOffset: number) => void;
+  /**
+   * Called once the underlying CodeMirror EditorView has mounted (with the
+   * view) and again with `null` when the editor is torn down. Lets consumers
+   * track view availability with React state instead of polling a ref.
+   */
+  onViewReady?: (view: EditorView | null) => void;
   /** Visual theme. Defaults to "light". */
   theme?: "light" | "dark";
   /** When true, the editor is non-editable (view-only mode). */
@@ -123,6 +129,7 @@ export const EditorComponent = forwardRef<EditorHandle, EditorProps>(
       onActiveTabChange,
       onContentChange,
       onNavigate,
+      onViewReady,
       theme = "light",
       readOnly,
       className,
@@ -153,12 +160,14 @@ export const EditorComponent = forwardRef<EditorHandle, EditorProps>(
     const onActiveTabChangeRef = useRef(onActiveTabChange);
     const onContentChangeRef = useRef(onContentChange);
     const onNavigateRef = useRef(onNavigate);
+    const onViewReadyRef = useRef(onViewReady);
 
     // Update the callback refs in a layout effect to avoid updating ref during render
     useEffect(() => {
       onActiveTabChangeRef.current = onActiveTabChange;
       onContentChangeRef.current = onContentChange;
       onNavigateRef.current = onNavigate;
+      onViewReadyRef.current = onViewReady;
     });
 
     const handleTabsChange = useCallback(
@@ -250,6 +259,7 @@ export const EditorComponent = forwardRef<EditorHandle, EditorProps>(
           parent: container,
         });
         viewRef.current = view;
+        onViewReadyRef.current?.(view);
 
         manager.attachView(view);
         manager.subscribe();
@@ -279,8 +289,12 @@ export const EditorComponent = forwardRef<EditorHandle, EditorProps>(
         managerRef.current?.detachView();
         managerRef.current?.dispose();
         managerRef.current = null;
+        // Only emit the null signal if we previously emitted a view, so the
+        // pair stays symmetric for callers that diff state on it.
+        const hadView = viewRef.current !== null;
         viewRef.current?.destroy();
         viewRef.current = null;
+        if (hadView) onViewReadyRef.current?.(null);
         client.terminate();
 
         workerClientRef.current = null;

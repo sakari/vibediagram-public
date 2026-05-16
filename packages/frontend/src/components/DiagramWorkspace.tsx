@@ -10,6 +10,7 @@ import { useAccount } from "jazz-tools/react";
 import {
   EditorComponent,
   type EditorHandle,
+  type EditorView,
   FileTreePanel,
 } from "@diagram/editor";
 import {
@@ -93,6 +94,11 @@ const DiagramWorkspace: React.FC = () => {
 
   const { document, isLoading } = useDiagramDocument(diagramId);
   const editorRef = useRef<EditorHandle | null>(null);
+  // Tracked as state so that mounting the underlying CodeMirror view triggers
+  // a re-render of the markdown preview, which needs the view to render its
+  // comment affordances. A ref alone would never notify React that the
+  // initially-null view is now available.
+  const [editorView, setEditorView] = useState<EditorView | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sim = useSimulation();
   const metricHistory = useMetricHistory(sim.snapshot, sim.status);
@@ -280,6 +286,14 @@ const DiagramWorkspace: React.FC = () => {
     () => [...SIM_MODEL_EXTRA_LIBS, ...HELP_FILE_ENTRIES],
     [],
   );
+
+  // Per-file read-only flag (e.g. help/README.md). The editor's CodeMirror
+  // buffer still accepts edits to these files locally, but they are never
+  // persisted, and the markdown preview shows the static `readOnly.content`,
+  // so any comment markup written into the buffer would silently vanish on
+  // re-render. Gate the comment UI accordingly.
+  const activeFileIsReadOnly =
+    activeFile !== null && allReadOnlyFiles.some((f) => f.path === activeFile);
 
   const handleFileSelect = useCallback(
     (path: string) => {
@@ -666,6 +680,7 @@ const DiagramWorkspace: React.FC = () => {
             onActiveTabChange={handleActiveTabChange}
             onContentChange={isReadOnly ? undefined : handleContentChange}
             onNavigate={handleNavigate}
+            onViewReady={setEditorView}
             readOnly={isReadOnly}
           />
         </CollapsiblePane>
@@ -714,9 +729,9 @@ const DiagramWorkspace: React.FC = () => {
             <MarkdownPreview
               source={markdownSource}
               editorView={
-                isReadOnly
+                isReadOnly || activeFileIsReadOnly
                   ? undefined
-                  : (editorRef.current?.getEditorView() ?? undefined)
+                  : (editorView ?? undefined)
               }
               currentAuthor={me.profile?.name}
               renderOverlay={
