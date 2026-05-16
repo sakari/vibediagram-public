@@ -98,6 +98,7 @@ export function DrawingToolbar({
           }
           aria-label="Hand (pan and zoom)"
           aria-pressed={state.tool === "hand"}
+          title="Switch to hand tool: pan and zoom without drawing"
           onClick={() => {
             setTool("hand");
           }}
@@ -113,6 +114,7 @@ export function DrawingToolbar({
           }
           aria-label="Pen"
           aria-pressed={state.tool === "pen"}
+          title="Switch to pen tool: draw strokes on the diagram"
           onClick={() => {
             setTool("pen");
           }}
@@ -128,6 +130,7 @@ export function DrawingToolbar({
           }
           aria-label="Eraser"
           aria-pressed={state.tool === "eraser"}
+          title="Switch to eraser tool: click strokes to delete them"
           onClick={() => {
             setTool("eraser");
           }}
@@ -155,6 +158,7 @@ export function DrawingToolbar({
                   }
                   aria-label={`Color ${color}`}
                   aria-pressed={active}
+                  title={`Use ${color} as the pen color`}
                   style={{ background: color }}
                   onClick={() => {
                     setColor(color);
@@ -181,6 +185,7 @@ export function DrawingToolbar({
                   }
                   aria-label={`Width ${String(width)}`}
                   aria-pressed={active}
+                  title={`Use ${String(width)}px as the pen width`}
                   onClick={() => {
                     setWidth(width);
                   }}
@@ -203,6 +208,7 @@ export function DrawingToolbar({
           type="button"
           className="drawing-toolbar-clear sim-btn sim-btn-danger"
           aria-label="Clear all drawings"
+          title="Delete all drawings from this diagram"
           onClick={onClear}
         >
           Clear all

@@ -72,6 +72,7 @@ export function TabBar({ tabs, activeTab, onSelect, onClose }: TabBarProps) {
             <button
               type="button"
               aria-label={`Close ${basename(path)}`}
+              title={`Close ${basename(path)}`}
               onClick={(e) => {
                 e.stopPropagation();
                 onClose(path);

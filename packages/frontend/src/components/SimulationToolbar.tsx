@@ -57,27 +57,47 @@ const SimulationToolbar: React.FC<SimulationToolbarProps> = ({
     <div className="simulation-toolbar">
       <div className="simulation-toolbar-buttons">
         {canRun && (
-          <button className="sim-btn sim-btn-primary" onClick={onRun}>
+          <button
+            className="sim-btn sim-btn-primary"
+            onClick={onRun}
+            title="Start the simulation"
+          >
             Run
           </button>
         )}
         {canPause && (
-          <button className="sim-btn" onClick={onPause}>
+          <button
+            className="sim-btn"
+            onClick={onPause}
+            title="Pause the running simulation"
+          >
             Pause
           </button>
         )}
         {canResume && (
           <>
-            <button className="sim-btn sim-btn-primary" onClick={onResume}>
+            <button
+              className="sim-btn sim-btn-primary"
+              onClick={onResume}
+              title="Resume the paused simulation"
+            >
               Resume
             </button>
-            <button className="sim-btn" onClick={onStep}>
+            <button
+              className="sim-btn"
+              onClick={onStep}
+              title="Advance the simulation by one step"
+            >
               Step
             </button>
           </>
         )}
         {canReset && (
-          <button className="sim-btn sim-btn-danger" onClick={onReset}>
+          <button
+            className="sim-btn sim-btn-danger"
+            onClick={onReset}
+            title="Reset the simulation to its initial state"
+          >
             Reset
           </button>
         )}

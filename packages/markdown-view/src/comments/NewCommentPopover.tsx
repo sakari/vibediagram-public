@@ -64,6 +64,7 @@ export function NewCommentPopover({
         onClick={() => {
           setSnapshot(liveSelection);
         }}
+        title="Start a new comment on the selected text"
       >
         Comment
       </button>
@@ -89,7 +90,11 @@ export function NewCommentPopover({
         placeholder="Add a comment..."
       />
       <div className="vd-new-comment-actions">
-        <button type="submit" disabled={draft.trim().length === 0}>
+        <button
+          type="submit"
+          disabled={draft.trim().length === 0}
+          title="Post this comment on the selected text"
+        >
           Submit
         </button>
         <button
@@ -99,6 +104,7 @@ export function NewCommentPopover({
             setDraft("");
             onClose();
           }}
+          title="Discard the draft and close this comment box"
         >
           Cancel
         </button>

@@ -519,6 +519,7 @@ const DiagramWorkspace: React.FC = () => {
                   window.localStorage.removeItem(JAZZ_API_KEY_STORAGE_KEY);
                   window.location.reload();
                 }}
+                title="Clear local-only mode and reload to enter a Jazz API key"
               >
                 Set up Jazz API key
               </button>
@@ -528,6 +529,7 @@ const DiagramWorkspace: React.FC = () => {
                 onClick={() => {
                   navigate("/projects");
                 }}
+                title="Return to the project list"
               >
                 Back to my projects
               </button>
@@ -593,6 +595,7 @@ const DiagramWorkspace: React.FC = () => {
             className="sim-btn sim-btn-primary"
             onClick={handleFork}
             disabled={forking}
+            title="Create your own editable copy of this project"
           >
             {forking ? "Forking..." : "Fork to edit"}
           </button>
@@ -613,6 +616,7 @@ const DiagramWorkspace: React.FC = () => {
                 window.location.href = `https://${url}/diagram/${diagramId}${hash}`;
               }
             }}
+            title="Reopen this project on the pinned app deployment"
           >
             Open in pinned version
           </button>
@@ -621,6 +625,7 @@ const DiagramWorkspace: React.FC = () => {
             onClick={() => {
               setVersionBannerDismissed(true);
             }}
+            title="Dismiss the banner and keep using the current app version"
           >
             Run on current version
           </button>
@@ -630,6 +635,7 @@ const DiagramWorkspace: React.FC = () => {
               pinToCurrentDeployment();
               setVersionBannerDismissed(true);
             }}
+            title="Pin this project to the current app version"
           >
             Migrate to latest
           </button>

@@ -467,6 +467,7 @@ export function FileTreePanel({
                         <button
                           type="button"
                           aria-label="New file"
+                          title="Create a new file in this folder"
                           onClick={(e) => {
                             e.stopPropagation();
                             setCreatingIn(data.path);
@@ -487,6 +488,7 @@ export function FileTreePanel({
                         <button
                           type="button"
                           aria-label="New folder"
+                          title="Create a new subfolder in this folder"
                           onClick={(e) => {
                             e.stopPropagation();
                             setCreatingIn(data.path);
@@ -509,6 +511,7 @@ export function FileTreePanel({
                     <button
                       type="button"
                       aria-label="Rename"
+                      title="Rename this file or folder"
                       onClick={(e) => {
                         e.stopPropagation();
                         tree.getItemInstance(item.getId()).startRenaming();
@@ -527,6 +530,7 @@ export function FileTreePanel({
                     <button
                       type="button"
                       aria-label="Delete"
+                      title="Delete this file or folder"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (data.isFolder) {

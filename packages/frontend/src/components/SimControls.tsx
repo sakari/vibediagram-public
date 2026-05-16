@@ -48,7 +48,12 @@ const SimControls: React.FC<SimControlsProps> = ({
         )}
 
         {onFork && (
-          <button className="sim-btn" onClick={onFork} disabled={forkDisabled}>
+          <button
+            className="sim-btn"
+            onClick={onFork}
+            disabled={forkDisabled}
+            title="Create your own editable copy of this project"
+          >
             {forkDisabled ? "Forking..." : "Fork"}
           </button>
         )}

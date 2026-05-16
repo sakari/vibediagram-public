@@ -74,6 +74,7 @@ export function ReferencesPanel({
         <button
           type="button"
           aria-label="Close references panel"
+          title="Close the references panel"
           onClick={onClose}
           style={{
             border: "none",

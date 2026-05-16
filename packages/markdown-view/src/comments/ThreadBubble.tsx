@@ -58,6 +58,7 @@ export function ThreadBubble({
         style={{ top }}
         onClick={onToggle}
         aria-label={`Open thread ${marker.id}`}
+        title="Expand this comment thread"
         data-thread-bubble-id={marker.id}
       >
         <span className="vd-comment-bubble-dot" aria-hidden="true" />
@@ -80,6 +81,7 @@ export function ThreadBubble({
           type="button"
           className="vd-comment-bubble-close"
           aria-label="Collapse thread"
+          title="Collapse this comment thread"
           onClick={onToggle}
         >
           x
@@ -106,10 +108,22 @@ export function ThreadBubble({
             rows={2}
           />
           <div className="vd-comment-bubble-actions">
-            <button type="submit" disabled={draft.trim().length === 0}>
+            <button
+              type="submit"
+              disabled={draft.trim().length === 0}
+              title="Post this reply to the thread"
+            >
               Reply
             </button>
-            <button type="button" onClick={handleResolve}>
+            <button
+              type="button"
+              onClick={handleResolve}
+              title={
+                thread.resolved
+                  ? "Reopen this resolved thread"
+                  : "Mark this thread as resolved"
+              }
+            >
               {thread.resolved ? "Reopen" : "Resolve"}
             </button>
           </div>

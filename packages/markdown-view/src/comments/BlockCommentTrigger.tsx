@@ -146,6 +146,7 @@ export function BlockCommentTrigger({
           onActivate(existingThreadId);
         }}
         aria-label="Open comment"
+        title="Open the existing comment thread for this block"
       >
         Open comment
       </button>
@@ -166,6 +167,7 @@ export function BlockCommentTrigger({
           setOpen(true);
         }}
         aria-label="Add comment"
+        title="Add a new comment on this block"
       >
         Comment
       </button>
@@ -185,10 +187,18 @@ export function BlockCommentTrigger({
         placeholder="Add a comment..."
       />
       <div className="vd-block-trigger-actions">
-        <button type="submit" disabled={draft.trim().length === 0}>
+        <button
+          type="submit"
+          disabled={draft.trim().length === 0}
+          title="Post this comment"
+        >
           Submit
         </button>
-        <button type="button" onClick={close}>
+        <button
+          type="button"
+          onClick={close}
+          title="Discard the draft and close this comment box"
+        >
           Cancel
         </button>
       </div>

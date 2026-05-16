@@ -88,6 +88,7 @@ export function AuthorizedAccountsSettings({ me, store }: Props) {
           onClick={() => {
             setOpen(false);
           }}
+          title="Close the shared access panel"
         >
           Close
         </button>
@@ -153,6 +154,7 @@ export function AuthorizedAccountsSettings({ me, store }: Props) {
           className="api-key-settings-save"
           onClick={handleAdd}
           disabled={!accountId.trim()}
+          title="Grant this account access to all your projects"
         >
           Add
         </button>

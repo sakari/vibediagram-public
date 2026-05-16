@@ -129,6 +129,7 @@ function ApiKeySettings() {
           className="api-key-settings-save"
           onClick={handleSave}
           disabled={!value.trim() || value.trim() === stored}
+          title="Save the Jazz API key and reload the app"
         >
           Save & Reload
         </button>
@@ -139,6 +140,7 @@ function ApiKeySettings() {
             setOpen(false);
             setValue(stored);
           }}
+          title="Discard changes and close this dialog"
         >
           Cancel
         </button>
@@ -222,6 +224,7 @@ const ProjectListPage: React.FC = () => {
             type="button"
             className="new-project-btn"
             onClick={handleNewProject}
+            title="Create a new empty project"
           >
             + New Project
           </button>
